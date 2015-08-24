@@ -1,0 +1,117 @@
+#!/bin/bash
+# Setup latest version of the siswrap service:
+
+# This requires pip and virtualenv
+
+user=$1
+group=$2
+type=$3
+source=$4
+installpath=$5
+
+if [ "$user" == "" ]; then
+    user="root"
+fi
+
+if [ "$group" == "" ]; then
+    group="root"
+fi
+
+if [ "$type" == "" ]; then
+    type="dev"
+fi
+
+if [ "$source" == "" ]; then
+    source="/arteria/arteria-lib/siswrap"
+fi
+
+if [ "$installpath" == "" ]; then
+    installpath="/opt/siswrap"
+fi
+
+echo "Installing from $source to $installpath, type=$type"
+mkdir -pv $installpath/etc
+depspath="$installpath/deps"
+mkdir -pv $depspath
+depsinstalled="$depspath/.sisyphus_deps_are_installed"
+virtualenv $installpath/
+cp $source/config/siswrap.config $installpath/etc/
+chown -R $user:$user $installpath
+
+# TODO: Don't install Sisyphus again of we already have it.
+# TODO: Install dependencies via Ansible provisioning instead?
+# PyXML?
+if ! test -f $depsinstalled ; then
+    echo "Installing dependencies for Sisyphus"
+
+    if test -f /etc/redhat-release ; then
+        yum install -y dos2unix gnuplot PyXML ImageMagick libxslt-devel libxml2-devel libxml2-devel ncurses-devel libtiff-devel bzip2-devel zlib2-devel perl-XML-LibXML perl-XML-LibXML-Common perl-XML-NamespaceSupport perl-XML-SAX perl-XML-Simple zlib-devel perl-Archive-Zip perl-CPAN git perl-PDL perl-PerlIO-gzip
+    else
+        apt-get update
+        apt-get -y install dos2unix gnuplot imagemagick libxslt1-dev libxml2-dev ncurses-dev libtiff-dev libbz2-dev zlib1g-dev build-essential libexpat1-dev pdl libperlio-gzip-perl git
+    fi
+
+    curl -L http://cpanmin.us | perl - App::cpanminus
+    cpanm XML::LibXML
+    #cpanm XML::LibXML::Common
+    #cpanm XML::NamespaceSupport
+    #cpanm XML::SAX
+    cpanm XML::Simple
+    cpanm Archive::Zip
+    cpanm File::NFSLock
+    touch $depsinstalled
+
+fi
+
+echo "Installing Sisyphus from github repo"
+# TODO: Deploy via Ansible instead.
+sisdest="$depspath/sisyphus"
+if test -d $sisdest ; then
+    rm -rf $sisdest
+fi
+cd $depspath && git clone https://github.com/Molmed/sisyphus.git
+# Temporary copy of QC criteria; atm the QCWrapper tries to copy this
+# into the runfolder; perhaps we should have something else do this.
+mkdir -p /srv/qc_config/
+cp $depspath/sisyphus/sisyphus_qc.xml /srv/qc_config/sisyphus_qc.xml
+
+# activate the virtualenv
+echo "Switching to the '$installpath' virtualenv"
+source $installpath/bin/activate
+
+if [ "$type" == "dev" ]; then
+    echo "Installing the siswrap package in development mode"
+    pip install -e file://$source -r $source/requirements/dev
+else
+    # TODO: Support prod
+    echo "NOTE: Installing the siswrap package in development mode" >&2
+    pip install -e file://$source -r $source/requirements/prod
+fi
+
+echo "Registering the siswrap-wsd daemon"
+cd $source/scripts/
+# TODO: no cd
+./install-daemon
+
+#echo "Starting siswrap-wsd"
+if [ "$type" == "dev" ]; then
+    service siswrap-wsd restart dev
+else
+    service siswrap-wsd restart
+fi
+
+if [ "$type" == "dev" ]; then
+    echo "Add siswrap-ws-test for easy integration testing"
+    testbin="/usr/local/bin/siswrap-ws-test"
+    echo "source $installpath/bin/activate" > $testbin
+    echo "py.test $source/tests/integration/*.py" >> $testbin
+
+    chmod +x $testbin
+
+    echo "Running integration tests"
+    $testbin
+else
+    echo "Not running tests"
+fi
+
+echo "Moving back to the default python environment"

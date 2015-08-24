@@ -1,0 +1,7 @@
+-r prod
+pytest
+pytest-cov
+pytest-tornado
+pytest-flakes
+coverage
+requests
