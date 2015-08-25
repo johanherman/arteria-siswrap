@@ -51,7 +51,7 @@ class TestProcessInfo(object):
 # Mini helper class for some of the tests
 class Helper(object):
     runfolder = "foo"
-    conf = ConfigurationService("../../config/siswrap.config")
+    conf = ConfigurationService("./config/siswrap.config")
     root = conf.get_setting("runfolder_root")
     logger = Logger(True)
 #    report = ReportWrapper(runfolder, conf, logger)
