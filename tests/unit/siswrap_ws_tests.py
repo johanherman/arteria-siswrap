@@ -18,7 +18,7 @@ def app():
 @pytest.fixture
 def setup():
     SisApp.logger = Logger(True)
-    SisApp.config_svc = ConfigurationService("../../config/siswrap.config")
+    SisApp.config_svc = ConfigurationService("./config/siswrap.config")
     SisApp.process_svc = ProcessService(SisApp.logger, SisApp.config_svc)
 
 
