@@ -1,26 +1,11 @@
 import os.path
-from .configuration import ConfigurationService
 import socket
 import subprocess
+import logging
+from arteria.web.state import State
 
 """ Simple wrapper for the Sisyphus tools suite.
 """
-
-
-# TODO: Temporary - will be replaced with logging framework
-class Logger:
-    DEBUG = False
-
-    def __init__(self, debug):
-        self.DEBUG = debug
-
-    def debug(self, msg): print msg if self.DEBUG else None
-
-    def info(self, msg): print msg
-
-    def warn(self, msg): print msg
-
-    def error(self, msg): print msg
 
 
 class ProcessInfo(object):
@@ -36,13 +21,8 @@ class ProcessInfo(object):
 
         Also keeps track of other meta data for the process.
     """
-    STATE_NONE = "none"
-    STATE_READY = "ready"
-    STATE_STARTED = "started"
-    STATE_DONE = "done"
-    STATE_ERROR = "error"
 
-    def __init__(self, runfolder=None, host=None, state=STATE_NONE,
+    def __init__(self, runfolder=None, host=None, state=State.NONE,
                  proc=None, msg=None, pid=None):
         self.runfolder = runfolder
         self.host = host
@@ -56,20 +36,22 @@ class ProcessInfo(object):
         return "{0} {3}: {1}@{2}".format(self.state, self.runfolder,
                                          self.host, self.pid)
 
-    # Update the appropriate meta data for the process when it has been started
-    def set_started(self, proc):
+    def set_started(self, process):
+        """ Update the appropriate meta data for the process when it has been started.
+        """
         self.host = ProcessService._host()
-        self.state = self.STATE_STARTED
-        self.proc = proc
+        self.state = State.STARTED
+        self.proc = process
         self.msg = "Process has been started"
-        self.pid = proc.pid
+        self.pid = process.pid
 
-    # Return an empty process information container if a non valid PID
-    # was requested
     @staticmethod
     def none_process(pid):
+        """  Return an empty process information container if a non valid PID
+             was requested.
+        """
         return ProcessInfo(host=ProcessService._host(), pid=pid,
-                           state=ProcessInfo.STATE_NONE,
+                           state=State.NONE,
                            msg="No such process exists")
 
 
@@ -90,11 +72,9 @@ class ExecString(object):
     def __init__(self, wrapper, conf_svc, runfolder):
         self.text = None
         bin_lookup = wrapper.binary_conf_lookup
-        self.text = [conf_svc.get_setting("perl"),
-                     conf_svc.get_setting(bin_lookup),
-                     "-runfolder", runfolder,
-                     "-mail", conf_svc.get_setting("receiver"),
-                     "-sender", conf_svc.get_setting("sender")]
+        conf = conf_svc.get_app_config()
+        self.text = [conf["perl"], conf[bin_lookup], "-runfolder", runfolder,
+                     "-mail", conf["receiver"], "-sender", conf["sender"]]
 
 
 class Wrapper(object):
@@ -105,33 +85,43 @@ class Wrapper(object):
             runfolder: the name of the runfolder to use (not full path)
             configuration_svc: the ConfigurationService for our config lookups
             logger: logger object for printouts
+
+        FIXME: Raises
     """
 
     QC_TYPE = "qc"
     REPORT_TYPE = "report"
 
-    def __init__(self, runfolder, configuration_svc, logger):
-        runpath = configuration_svc.get_setting("runfolder_root") + runfolder
+    def __init__(self, runfolder, configuration_svc, logger=None):
+        conf = configuration_svc.get_app_config()
+        runpath = conf["runfolder_root"] + runfolder
 
         if not os.path.isdir(runpath):
             raise OSError("No runfolder {0} exists.".format(runpath))
 
         self.info = ProcessInfo(runpath)
         self.conf_svc = configuration_svc
-        self.logger = logger
+        self.logger = logger or logging.getLogger(__name__)
 
     def __get_attr__(self, attr):
         return getattr(self.info, attr)
 
+    # TODO: Perhaps implement support for stopping running process.
     def stop(self):
         pass
 
-    # Creates an execution string that will be unique depending on calling
-    # object and spawns a subprocess with this.
     def run(self):
+        """  Creates an execution string that will be unique depending on
+             what kind of object did the call to the method. Spawns a subprocess
+             with this execution string.
+
+             Raises:
+                OSError, ValueError: if an error occured with the subprocess
+        """
         try:
             if os.getenv("ARTERIA_TEST"):
                 proc = subprocess.Popen(["/bin/sleep", "1m"])
+                exec_string = "/bin/sleep 1m"
             else:
                 exec_string = ExecString(self, self.conf_svc,
                                          self.info.runfolder).text
@@ -140,15 +130,15 @@ class Wrapper(object):
 
             self.info.set_started(proc)
             self.logger.info("{0} started for {1} with: {2}".
-                             format(type(self), self.info.runfolder,
-                                    exec_string))
+                             format(type(self), self.info.runfolder, exec_string))
         except (OSError, ValueError), err:
             self.logger.error("An error occurred in Wrapper for {0}: {1}".
                               format(self.info.runfolder, err))
 
-    # Helper method to see which wrapper object might belong to which URL
     @staticmethod
     def url_to_type(url):
+        """ Helper method to see which wrapper object might belong to which URL.
+        """
         # TODO: Take out the correct part of the URL instead.
         if Wrapper.QC_TYPE in url:
             return Wrapper.QC_TYPE
@@ -158,14 +148,15 @@ class Wrapper(object):
             raise RuntimeError("Unknown wrapper runner requested: {0}".
                                format(url))
 
-    # Helper method for returning an appropriate wrapper object, depending on
-    # the requested type
     @staticmethod
-    def new_wrapper(wrapper_type, runfolder, configuration_svc, logger):
+    def new_wrapper(wrapper_type, runfolder, configuration_svc):
+        """ Helper method for returning an appropriate wrapper object, depending on
+            the requested type.
+        """
         if wrapper_type == Wrapper.QC_TYPE:
-            return QCWrapper(runfolder, configuration_svc, logger)
+            return QCWrapper(runfolder, configuration_svc)
         elif wrapper_type == Wrapper.REPORT_TYPE:
-            return ReportWrapper(runfolder, configuration_svc, logger)
+            return ReportWrapper(runfolder, configuration_svc)
         else:
             raise RuntimeError("Unknown wrapper runner requested: {0}".
                                format(wrapper_type))
@@ -181,10 +172,9 @@ class ReportWrapper(Wrapper):
             logger: the Logger object in charge of logging output
     """
 
-    def __init__(self, runfolder, configuration_svc, logger):
+    def __init__(self, runfolder, configuration_svc):
         super(ReportWrapper, self).__init__(runfolder,
-                                            configuration_svc,
-                                            logger)
+                                            configuration_svc)
         self.binary_conf_lookup = "report_bin"
         self.type_txt = Wrapper.REPORT_TYPE
 
@@ -197,20 +187,24 @@ class QCWrapper(Wrapper):
              runfolder: the runfolder to start processing (not full path)
              configuration_svc: ConfigurationService serving our conf lookups
              logger: the Logger object in charge of logging output
+
+        Raises:
+            IOError: if we couldn't copy the QC settings input file
      """
 
-    def __init__(self, runfolder, configuration_svc, logger):
-        super(QCWrapper, self).__init__(runfolder, configuration_svc, logger)
+    def __init__(self, runfolder, configuration_svc, logger=None):
+        super(QCWrapper, self).__init__(runfolder, configuration_svc)
         self.binary_conf_lookup = "qc_bin"
         self.type_txt = Wrapper.QC_TYPE
+        self.logger = logger or logging.getLogger(__name__)
 
         try:
             # Copy QC settings file from central server location (provisioned
             # from elsewhere) to current runfolder destination
             import shutil
-            src = self.conf_svc.get_setting("qc_file")
-            dst = self.conf_svc.get_setting("runfolder_root") + \
-                runfolder + "/sisyphus_qc.xml"
+            conf = self.conf_svc.get_app_config()
+            src = conf["qc_file"]
+            dst = conf["runfolder_root"] + runfolder + "/sisyphus_qc.xml"
             shutil.copyfile(src, dst)
         except IOError, err:
             self.logger.error("Couldn't copy file {0} to {1}: {2}".
@@ -241,30 +235,45 @@ class ProcessService(object):
 
     proc_queue = {}
 
-    def __init__(self, configuration_svc, logger):
+    def __init__(self, configuration_svc, logger=None):
         self.conf_svc = configuration_svc
-        self.logger = logger
+        self.logger = logger or logging.getLogger(__name__)
 
     @staticmethod
     def _host():
         return socket.gethostname()
 
-    # Execute the wrapper object and add it to the process queue.
-    # Return the object to the caller, since it will contain information
-    # about the process.
     def run(self, wrapper_object):
+        """  Execute the wrapper object and add it to the process queue.
+
+            Args:
+                wrapper_object: the object to put in the process queue and run
+
+            Returns:
+                the wrapper_object, filled with some extra meta information
+
+            Raises:
+                RuntimeError: something unexpected happened when running the process
+        """
         try:
             wrapper_object.run()
             ProcessService.proc_queue[wrapper_object.info.pid] = wrapper_object
             return wrapper_object
         except RuntimeError, err:
-            self.info.error("An error ocurred in ProcessService for: {0}".
-                            format(err))
+            self.logger.error("An error ocurred in ProcessService for: {0}".
+                              format(err))
 
-    # Poll the status of the process. Removes it from the queue if finished.
-    # Accepts a pid and returns the associated ProcessInfo if it exists,
-    # otherwise an empty ProcessInfo with state NONE.
     def poll_process(self, pid):
+        """ Poll the status of the process. Removes it from the queue if finished.
+            Accepts a pid and returns the associated ProcessInfo if it exists,
+            otherwise an empty ProcessInfo with state NONE.
+
+            Args:
+                pid: the pid of the process to poll
+
+            Returns:
+                the associated ProcessInfo if it exists, otherwise an empty ProcessInfo
+        """
 
         pid = int(pid)
         wrapper = ProcessService.proc_queue.get(pid)
@@ -280,11 +289,11 @@ class ProcessService(object):
         if returncode < 0 and returncode is not None:
             wrapper.info.msg = ("Process was terminated with "
                                 "Unix code {0}.").format(returncode)
-            wrapper.info.state = ProcessInfo.STATE_ERROR
+            wrapper.info.state = State.ERROR
         elif returncode == 0 and returncode is not None:
             # We can't communicate with a dead process; became obvious
             # within Docker testing
-            if wrapper.info.state is not ProcessInfo.STATE_DONE:
+            if wrapper.info.state is not State.DONE:
                 out, err = proc.communicate()
                 wrapper.info.msg = ("Process was completed successfully with "
                                     "return code ") + str(returncode) + "."
@@ -293,18 +302,18 @@ class ProcessService(object):
                     out = "(no txt msg)"
 
                 debugmsg = "Message was: " + out
-                wrapper.info.state = ProcessInfo.STATE_DONE
+                wrapper.info.state = State.DONE
         elif returncode > 0:
             try:
                 # We can only communicate with the process if it hasn't been
                 # killed off.
-                if wrapper.info.state is not ProcessInfo.STATE_ERROR:
+                if wrapper.info.state is not State.ERROR:
                     out, err = proc.communicate()
                     wrapper.info.msg = ("Process was completed successfully, "
                                         "but encounted an error, with return "
                                         "code {0}.").format(returncode)
                     debugmsg = "Message was: " + err
-                    wrapper.info.state = ProcessInfo.STATE_ERROR
+                    wrapper.info.state = State.ERROR
             except OSError, err:
                 self.logger.debug(("An error occurred in "
                                    "ProcessService:poll_process() for {0}/{1} "
@@ -312,7 +321,7 @@ class ProcessService(object):
                                   format(pid, wrapper.type_txt, err))
         else:
             wrapper.info.msg = "Process " + str(pid) + " hasn't finished yet."
-            wrapper.info.state = ProcessInfo.STATE_STARTED
+            wrapper.info.state = State.STARTED
 
         self.logger.debug(("In ProcessService:poll_process() for "
                            "{0}/{1}: {2} {3}").format(pid,
@@ -321,9 +330,18 @@ class ProcessService(object):
                                                       debugmsg))
         return wrapper.info
 
-    # At the moment we only delete the entry from the queue when we're
-    # checking the status per pid.
     def get_status(self, pid, wrapper_type):
+        """ Get status of a specific process. Removes the pid from the queue
+            if the proecess has finished executing.
+
+            Args:
+                pid: the pid of the process to check for
+                wrapper_type: the type of the process we want to check
+
+            Returns:
+                a ProcessInfo filled with status information if it is still
+                running, otherwise an empty ProcessInfo
+        """
         pid = int(pid)
 
         # If someone is requesting an existing process but of the wrong type
@@ -340,18 +358,26 @@ class ProcessService(object):
         # Remove the process from the queue if we're checking the status and
         # it has finished. Don't remove a key if we are still working, or if
         # the process doesn't exist
-        if proc_info.state not in [ProcessInfo.STATE_STARTED,
-                                   ProcessInfo.STATE_NONE]:
+        if proc_info.state not in [State.STARTED,
+                                   State.NONE]:
             self.logger.debug(("Process {0} has finished/terminated. "
                               "Removing from queue.").format(pid))
             del ProcessService.proc_queue[pid]
 
         return proc_info
 
-    # Get status of all running processes
     # Should we respond with a status link? Should we return something more
     # than empty list when we have no results?
     def get_all(self, wrapper_type):
+        """ Get status of all running processes
+
+            Args:
+                wrapper_type: the object type to check statuses for
+
+            Returns:
+                a list of processes and some meta information if they are running, otherwise
+                an empty list
+        """
         # Only update processes of our requested wrapper class
         map(lambda pid: self.poll_process(pid)
             if ProcessService.proc_queue[pid].type_txt is wrapper_type

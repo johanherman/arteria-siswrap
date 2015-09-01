@@ -1,9 +1,10 @@
 import pytest
-from siswrap.siswrap import *
-from siswrap.siswrap_ws import *
-from siswrap.configuration import *
+from arteria.configuration import ConfigurationService
+from arteria.web.state import State
+from siswrap.handlers import *
+from siswrap.wrapper_services import *
 
-# Some tests for siswrap/siswrap.py.
+# Some tests for siswrap/wrapper_services.py.
 
 
 class TestProcessInfo(object):
@@ -51,46 +52,54 @@ class TestProcessInfo(object):
 # Mini helper class for some of the tests
 class Helper(object):
     runfolder = "foo"
-    conf = ConfigurationService("./config/siswrap.config")
-    root = conf.get_setting("runfolder_root")
-    logger = Logger(True)
-#    report = ReportWrapper(runfolder, conf, logger)
-    proc_svc = ProcessService(conf, logger)
+    conf = ConfigurationService(app_config_path="./config/siswrap.config")
+    root = conf.get_app_config()["runfolder_root"]
+    # root = "/tmp"
+
+    # runfolderpath = root + "/arteria_tmp/" + runfolder
+    # if not os.path.exists(runfolderpath):
+    #    os.makedirs(runfolderpath)
+
+    # logger = Logger(True)
+    # report = ReportWrapper(runfolder, conf, logger)
+    proc_svc = ProcessService(conf)
+
+
+# Return true regardless whether or not the runfolder exists
+@pytest.fixture
+def stub_isdir(monkeypatch):
+    def my_isdir(path):
+        return True
+
+    monkeypatch.setattr("os.path.isdir", my_isdir)
 
 
 class TestReportWrapper(object):
 
-    report = ReportWrapper(Helper.runfolder, Helper.conf, Helper.logger)
-
     # The ReportWrapper class should be setup properly
-    def test_creation(self):
-        assert isinstance(self.report.conf_svc, ConfigurationService) is True
-        assert isinstance(self.report.logger, Logger) is True
+    def test_creation(self, stub_isdir):
+        report = ReportWrapper(Helper.runfolder, Helper.conf)
+        assert isinstance(report.conf_svc, ConfigurationService) is True
 
     # We should be able to access the ProcessInfo's attributes
-    def test_info_attr(self):
-        assert isinstance(self.report.info, ProcessInfo) is True
-        assert self.report.info.runfolder == Helper.root + Helper.runfolder
+    def test_info_attr(self, stub_isdir):
+        report = ReportWrapper(Helper.runfolder, Helper.conf)
+        assert isinstance(report.info, ProcessInfo) is True
+        assert report.info.runfolder == Helper.root + Helper.runfolder
 
     # And we should inherit from the base Wrapper class
-    def test_inheritance(self):
+    def test_inheritance(self, stub_isdir):
         assert issubclass(ReportWrapper, Wrapper) is True
 
 
 class TestWrapper(object):
 
     # Wrapper base class should be setup properly
-    def test_creation(self, monkeypatch):
-
-        def mocked_isdir(runpath):
-            return True
-
-        monkeypatch.setattr("os.path.isdir", mocked_isdir)
-        wrapper = Wrapper(Helper.runfolder, Helper.conf, Helper.logger)
+    def test_creation(self, stub_isdir):
+        wrapper = Wrapper(Helper.runfolder, Helper.conf)
 
         assert isinstance(wrapper.info, ProcessInfo) is True
         assert isinstance(wrapper.conf_svc, ConfigurationService) is True
-        assert isinstance(wrapper.logger, Logger) is True
 
         assert wrapper.QC_TYPE == "qc"
         assert wrapper.REPORT_TYPE == "report"
@@ -98,7 +107,7 @@ class TestWrapper(object):
     # Run method should setup a ExecString for the calling object in question
     # and spawn a subprocess with it, as well as update the process info's
     # attributes.
-    def test_run(self, monkeypatch):
+    def test_run(self, stub_isdir, monkeypatch):
         pass_mocked = True
 
         class MockedExecString(object):
@@ -108,8 +117,8 @@ class TestWrapper(object):
                 else:
                     self.text = ["/bin/uggla"]
 
-        monkeypatch.setattr("siswrap.siswrap.ExecString", MockedExecString)
-        w = Wrapper(Helper.runfolder, Helper.conf, Helper.logger)
+        monkeypatch.setattr("siswrap.wrapper_services.ExecString", MockedExecString)
+        w = Wrapper(Helper.runfolder, Helper.conf)
         w.run()
 
         assert isinstance(w.info.proc, subprocess.Popen)
@@ -124,11 +133,11 @@ class TestWrapper(object):
 
     # Helper method should return the correct wrapper object for
     # different text inputs
-    def test_new_wrapper(self):
+    def test_new_wrapper(self, stub_isdir):
         qc_wrap = Wrapper.new_wrapper("qc", Helper.runfolder,
-                                      Helper.conf, Helper.logger)
+                                      Helper.conf)
         report_wrap = Wrapper.new_wrapper("report", Helper.runfolder,
-                                          Helper.conf, Helper.logger)
+                                          Helper.conf)
 
         assert qc_wrap.type_txt == "qc"
         assert report_wrap.type_txt == "report"
@@ -139,7 +148,7 @@ class TestWrapper(object):
 
     # Helper method should return the correct wrapper type in text
     # format for different URLs
-    def test_url_to_type(self):
+    def test_url_to_type(self, stub_isdir):
         test_urls = ["http://arteria1:1111/v1/api/qc/run/8312",
                      "https://arteria12:3232/v2/api/report/run/3232",
                      "http://testweb/api/1/qc/status",
@@ -154,36 +163,31 @@ class TestWrapper(object):
 
 
 class TestQCWrapper(object):
-    qc = QCWrapper(Helper.runfolder, Helper.conf, Helper.logger)
 
     # QCWrapper should be setup correctly
-    def test_creation(self, monkeypatch):
-        assert isinstance(self.qc.info, ProcessInfo) is True
-        assert isinstance(self.qc.logger, Logger) is True
-        assert isinstance(self.qc.conf_svc, ConfigurationService) is True
+    def test_creation(self, stub_isdir, monkeypatch):
+        qc = QCWrapper(Helper.runfolder, Helper.conf)
+        assert isinstance(qc.info, ProcessInfo) is True
+        assert isinstance(qc.conf_svc, ConfigurationService) is True
 
         # test the file copy
         dstdir = "/tmp/test_siswrap/runfolder_root/"
         testsrc = dstdir + "qc_file.txt"
 
-        def mocked_get_setting(self, setting):
-            if setting == "qc_file":
-                return testsrc
-            elif setting == "runfolder_root":
-                return dstdir
-            else:
-                return setting
+        def mocked_get_config(self):
+            return {"qc_file": testsrc, "runfolder_root": dstdir}
 
-        # Create the src file
+        # Create the test src file, ignore error if it exists
         import io
-        if not os.path.isdir(dstdir + Helper.runfolder):
+        try:
             os.makedirs(dstdir + Helper.runfolder)
-        if not os.path.exists(testsrc):
             io.open(testsrc, 'a').close()
+        except:
+            pass
 
-        monkeypatch.setattr("siswrap.siswrap.ConfigurationService.get_setting",
-                            mocked_get_setting)
-        qc = QCWrapper(Helper.runfolder, Helper.conf, Helper.logger)
+        monkeypatch.setattr("arteria.configuration.ConfigurationService.get_app_config",
+                            mocked_get_config)
+        qc = QCWrapper(Helper.runfolder, Helper.conf)
         assert os.path.exists(dstdir + Helper.runfolder +
                               "/sisyphus_qc.xml") is True
 
@@ -192,9 +196,10 @@ class TestQCWrapper(object):
         shutil.rmtree(dstdir)
 
     # QCWrapper should be able to get the attributes from ProcessInfo
-    def test_info_attr(self):
-        assert isinstance(self.qc.info, ProcessInfo) is True
-        assert self.qc.info.runfolder == Helper.root + Helper.runfolder
+    def test_info_attr(self, stub_isdir):
+        qc = QCWrapper(Helper.runfolder, Helper.conf)
+        assert isinstance(qc.info, ProcessInfo) is True
+        assert qc.info.runfolder == Helper.root + Helper.runfolder
 
     # QCWrapper should inherit Wrapper
     def test_inheritance(self):
@@ -211,11 +216,11 @@ class TestExecString(object):
             def __init__(self):
                 self.binary_conf_lookup = "foobar"
 
-        def mocked_get_setting(self, setting):
-            return setting
+        def mocked_get_config(self):
+            return {"perl": "", "sender": "", "receiver": "", "foobar": "foobar"}
 
-        monkeypatch.setattr("siswrap.siswrap.ConfigurationService.get_setting",
-                            mocked_get_setting)
+        monkeypatch.setattr("arteria.configuration.ConfigurationService.get_app_config",
+                            mocked_get_config)
 
         foobar = FooBar()
         retobj = ExecString(foobar, Helper.conf, Helper.runfolder)
@@ -234,15 +239,14 @@ class TestProcessService(object):
     # The ProcessService should be setup up properly with logging and
     # a config
     def test_creation(self):
-        ps = ProcessService(Helper.proc_svc.conf_svc, Helper.logger)
+        ps = ProcessService(Helper.proc_svc.conf_svc)
         assert isinstance(ps.conf_svc, ConfigurationService) is True
-        assert isinstance(ps.logger, Logger) is True
         assert type(ps.proc_queue) is dict
 
     # ProcessService should be able to run a specified wrapper object,
     # which should then end up in the process queue for later status polling
     def test_run(self):
-        ps = ProcessService(Helper.proc_svc.conf_svc, Helper.logger)
+        ps = ProcessService(Helper.proc_svc.conf_svc)
 
         class MyInfo(object):
             pid = 4242
@@ -265,7 +269,7 @@ class TestProcessService(object):
                 self.pid = pid
                 self.runfolder = pid
                 self.host = pid
-                self.state = ProcessInfo.STATE_STARTED
+                self.state = State.STARTED
                 self.proc = subprocess.Popen("/bin/bash")
                 print "self", self.pid
 
@@ -290,11 +294,11 @@ class TestProcessService(object):
 
     # Test that we can poll a specific process in the process queue correctly
     def test_polling(self, monkeypatch):
-        ps = ProcessService(Helper.proc_svc.conf_svc, Helper.logger)
+        ps = ProcessService(Helper.proc_svc.conf_svc)
         poll_return = 0
         # populate queue
         self.my_queue = self.setup_queue()
-        monkeypatch.setattr("siswrap.siswrap.ProcessService.proc_queue",
+        monkeypatch.setattr("siswrap.wrapper_services.ProcessService.proc_queue",
                             self.my_queue)
 
         # mock syscall
@@ -310,66 +314,66 @@ class TestProcessService(object):
         # check that we get none process info if we request invalid pid
         res = ps.poll_process(7575)
         assert res.pid == 7575
-        assert res.state == ProcessInfo.STATE_NONE
+        assert res.state == State.NONE
 
         # check that we get a state_error if the return value from poll
         # is negative
         poll_return = -1
         res = ps.poll_process(4242)
         assert res.pid == 4242
-        assert res.state == ProcessInfo.STATE_ERROR
+        assert res.state == State.ERROR
 
         # check that we get a state_done if the return value is 0.
         poll_return = 0
         res = ps.poll_process(3131)
         assert res.pid == 3131
-        assert res.state == ProcessInfo.STATE_DONE
+        assert res.state == State.DONE
 
         # check that we get a state_error when retcode > 0
         poll_return = 1
         res = ps.poll_process(5353)
         assert res.pid == 5353
-        assert res.state == ProcessInfo.STATE_ERROR
+        assert res.state == State.ERROR
 
         # check that we get state_started when we don't have a return code
         poll_return = None
         res = ps.poll_process(4242)
         assert res.pid == 4242
-        assert res.state == ProcessInfo.STATE_STARTED
+        assert res.state == State.STARTED
 
     # Test that we can check the status of a specific process in the
     # process queue
     def test_status(self, monkeypatch):
-        ps = ProcessService(Helper.proc_svc.conf_svc, Helper.logger)
+        ps = ProcessService(Helper.proc_svc.conf_svc)
 
         # Insert a wrapper manually in the queue
         self.my_queue = self.setup_queue()
-        monkeypatch.setattr("siswrap.siswrap.ProcessService.proc_queue",
+        monkeypatch.setattr("siswrap.wrapper_services.ProcessService.proc_queue",
                             self.my_queue)
 
         # Check that the type_txt describes the same wrapper_type as we request
         # in the call to get_status; if so, poll the wrappers pid; else
         # return an empty ProcessInfo
-        monkeypatch.setattr("siswrap.siswrap.ProcessService.poll_process",
+        monkeypatch.setattr("siswrap.wrapper_services.ProcessService.poll_process",
                             self.my_poll)
 
         res = ps.get_status(4242, "qc")
         assert res.pid == 4242
-        assert res.state == ProcessInfo.STATE_STARTED
+        assert res.state == State.STARTED
         assert self.my_queue[4242].info.pid == 4242
 
         res = ps.get_status(3131, "report")
         assert res.pid == 3131
-        assert res.state == ProcessInfo.STATE_STARTED
+        assert res.state == State.STARTED
         assert self.my_queue[3131].info.pid == 3131
 
         # Check that the wrapper is removed from the queue if it has
         # some other status than none and started.
 
-        self.my_queue[4242].info.state = ProcessInfo.STATE_ERROR
+        self.my_queue[4242].info.state = State.ERROR
         res = ps.get_status(4242, "qc")
         assert res.pid == 4242
-        assert res.state == ProcessInfo.STATE_ERROR
+        assert res.state == State.ERROR
         with pytest.raises(Exception) as err:
             self.my_queue[4242]
 
@@ -377,18 +381,18 @@ class TestProcessService(object):
         # as response
         res = ps.get_status(3131, "qc")
         assert res.pid == 3131
-        assert res.state == ProcessInfo.STATE_NONE
+        assert res.state == State.NONE
 
     # Test that we can fetch the status of all the current processes
     # in the queue
     def test_status_all(self, monkeypatch):
         self.my_queue = self.setup_queue()
         # populate the queue with some wrappers of different kinds
-        monkeypatch.setattr("siswrap.siswrap.ProcessService.proc_queue",
+        monkeypatch.setattr("siswrap.wrapper_services.ProcessService.proc_queue",
                             self.my_queue)
 
         # mock poll_process
-        monkeypatch.setattr("siswrap.siswrap.ProcessService.poll_process",
+        monkeypatch.setattr("siswrap.wrapper_services.ProcessService.poll_process",
                             self.my_poll)
 
         # self.my_queue[4242].type_txt = "qc"
@@ -396,7 +400,7 @@ class TestProcessService(object):
         # print "my_queue", my_queue
         # print "types", my_queue[3131].type_txt, my_queue[4242].type_txt,
         # my_queue[5353].type_txt
-        ps = ProcessService(Helper.conf, Helper.logger)
+        ps = ProcessService(Helper.conf)
 
         # verify that we get back a list of dicts with correct keys
         # and values (which comes from the wrappers process info attribute.
@@ -404,13 +408,13 @@ class TestProcessService(object):
         assert res[0]["host"] == 4242
         assert res[0]["runfolder"] == 4242
         assert res[0]["pid"] == 4242
-        assert res[0]["state"] == ProcessInfo.STATE_STARTED
+        assert res[0]["state"] == State.STARTED
 
         res = ps.get_all("report")
         assert res[0]["host"] == 3131
         assert res[0]["runfolder"] == 3131
         assert res[0]["pid"] == 3131
-        assert res[0]["state"] == ProcessInfo.STATE_STARTED
+        assert res[0]["state"] == State.STARTED
 
         res = ps.get_all("foo")
         assert len(res) == 0

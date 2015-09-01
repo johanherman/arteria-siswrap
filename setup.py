@@ -1,6 +1,7 @@
 from setuptools import setup, find_packages
-from siswrap import __version__
 import os
+from siswrap import __version__
+
 
 def read_file(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -15,6 +16,6 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     entry_points={
-        'console_scripts': [ 'siswrap-ws = siswrap.siswrap_ws:start' ]
+        'console_scripts': ['siswrap-ws = siswrap.app:start']
     }
 )
