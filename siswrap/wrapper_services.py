@@ -315,7 +315,7 @@ class ProcessService(object):
                     debugmsg = "Message was: " + err
                     wrapper.info.state = State.ERROR
             except OSError, err:
-                self.logger.debug(("An error occurred in "
+                self.logger.error(("An error occurred in "
                                    "ProcessService:poll_process() for {0}/{1} "
                                    "when communicating with the process: {2}").
                                   format(pid, wrapper.type_txt, err))
@@ -323,7 +323,7 @@ class ProcessService(object):
             wrapper.info.msg = "Process " + str(pid) + " hasn't finished yet."
             wrapper.info.state = State.STARTED
 
-        self.logger.debug(("In ProcessService:poll_process() for "
+        self.logger.info(("In ProcessService:poll_process() for "
                            "{0}/{1}: {2} {3}").format(pid,
                                                       wrapper.type_txt,
                                                       wrapper.info.msg,
