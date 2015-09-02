@@ -18,19 +18,6 @@ class BaseSiswrapHandler(BaseRestHandler):
         self.process_svc = process_svc
         self.config_svc = config_svc
 
-    def write_object(self, obj, http_code=200, reason="OK"):
-        """ Write a JSON object back to client
-
-            Args:
-                obj: the dict we want to write
-                http_code: what http code to respond with
-                reason: what http reason to respond with
-        """
-        self.set_status(http_code, reason)
-        self.set_header("Content-Type", "application/json")
-        resp = jsonpickle.encode(obj, unpicklable=False)
-        self.write(resp)
-
     def write_status(self, proc_info):
         """
         Respond with different HTTP messages depending on the return code
@@ -39,26 +26,28 @@ class BaseSiswrapHandler(BaseRestHandler):
         Args:
             proc_info: the ProcessInfo to check so we know what kind of respond to send
         """
+        http_code = self.HTTP_OK
+        reason = "OK"
 
         # Write output for specific process
         if type(proc_info) is dict:
             state = proc_info.get("state")
 
             if state == State.STARTED:
-                self.write_object(proc_info, self.HTTP_OK,
-                                  "OK - still processing")
+                reason = "OK - still processing"
             elif state == State.DONE:
-                self.write_object(proc_info, self.HTTP_OK,
-                                  "OK - finished processing")
+                reason = "OK - finished processing"
             elif state == State.ERROR:
-                self.write_object(proc_info, self.HTTP_OK,
-                                  "OK - but error occured while processing")
+                reason = "OK - but an error occured while processing"
             else:
-                self.write_object(proc_info, self.HTTP_ERROR,
-                                  "An error occurred")
+                http_code = self.HTTP_ERROR
+                reason = "An unexpected error occured"
         # Write output for all processes
         else:
-            self.write_object(proc_info, self.HTTP_OK, "OK")
+            reason = "OK"
+
+        self.set_status(http_code, reason)
+        self.write_object(proc_info)
 
     def write_accepted(self, proc_info):
         """
@@ -69,12 +58,18 @@ class BaseSiswrapHandler(BaseRestHandler):
             proc_info: the ProcessInfo to write back to the client
         """
         state = proc_info.get("state")
+        http_code = self.HTTP_OK
+        reason = "OK"
 
         if state == State.STARTED:
-            self.write_object(proc_info, self.HTTP_ACCEPTED,
-                              "Request accepted")
+            http_code = self.HTTP_ACCEPTED
+            reason = "Request accepted"
         else:
-            self.write_object(proc_info, self.HTTP_ERROR, "An error occurred")
+            http_code = self.HTTP_ERROR
+            reason = "An unexpected error occurred"
+
+        self.set_status(http_code, reason)
+        self.write_object(proc_info)
 
     def append_status_link(self, wrapper):
         wrapper.info.link = self.create_status_link(wrapper.type_txt,
@@ -104,13 +99,10 @@ class RunHandler(BaseSiswrapHandler):
     def post(self, runfolder="/some/runfolder"):
         try:
             url = self.request.uri.strip()
-            payload = {}
 
-            if self.request.body:
-                payload = jsonpickle.decode(self.request.body)
-                runfolder = payload.get("runfolder").strip()
-            else:
-                raise RuntimeError("Cannot handle empty request body")
+            expect_param = ["runfolder"]
+            body = self.body_as_object(expect_param)
+            runfolder = body["runfolder"].strip()
 
             # Return a new wrapper object depending on what was requested in
             # the URL, and then ask the process service to start execution.

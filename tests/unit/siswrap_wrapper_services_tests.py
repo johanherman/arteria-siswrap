@@ -52,7 +52,7 @@ class TestProcessInfo(object):
 # Mini helper class for some of the tests
 class Helper(object):
     runfolder = "foo"
-    conf = ConfigurationService(app_config_path="./config/siswrap.config")
+    conf = ConfigurationService(app_config_path="./config/app.config")
     root = conf.get_app_config()["runfolder_root"]
     # root = "/tmp"
 
@@ -144,7 +144,7 @@ class TestWrapper(object):
 
         with pytest.raises(Exception) as err:
             Wrapper.new_wrapper("foo", Helper.runfolder,
-                                Helper.conf, Helper.logger)
+                                Helper.conf)
 
     # Helper method should return the correct wrapper type in text
     # format for different URLs
