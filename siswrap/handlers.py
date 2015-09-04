@@ -82,21 +82,24 @@ class BaseSiswrapHandler(BaseRestHandler):
 class RunHandler(BaseSiswrapHandler):
     """ Our handler for requesting the launch of a new quick report and
         quality control.
-
-        Args:
-            runfolder: Which runfolder to generate a report or quality control
-                       for.
-
-        Returns:
-            A status code HTTP 202 if the report generation or quality control
-            is initialised successfully, and a JSON response including a link
-            to the status page to poll. An error code HTTP 500 otherwise.
-
-        Raises:
-            RuntimeError if an empty POST body was sent in, or an unknown
-            wrapper runner was requested.
     """
     def post(self, runfolder="/some/runfolder"):
+        """ Start running Sisyphus quick report or quality control for specific
+            runfolder.
+
+            Args:
+                runfolder: Which runfolder to generate a report or quality
+                           control for.
+
+            Returns:
+                A status code HTTP 202 if the report generation or quality control
+                is initialised successfully, and a JSON response including a link
+                to the status page to poll. An error code HTTP 500 otherwise.
+
+            Raises:
+                RuntimeError if an empty POST body was sent in, or an unknown
+                wrapper runner was requested.
+        """
         try:
             url = self.request.uri.strip()
 
@@ -127,17 +130,19 @@ class RunHandler(BaseSiswrapHandler):
 class StatusHandler(BaseSiswrapHandler):
     """ Our handler for checking on the status of the report generation or
         quality control.
-
-        Args:
-            id: The ID of the process to check status of.
-            Or empty if all processes should be returned.
-
-        Returns:
-            JSON with fields that describe current status for requested
-            process. List of dicts with Current status of all the processes
-            if input parameter was non-existant.
     """
     def get(self, pid):
+        """ Get the status for a Sisyphus quick report or quality control run.
+
+                Args:
+                    id: The ID of the process to check status of.
+                    Or empty if all processes should be returned.
+
+                Returns:
+                    JSON with fields that describe current status for requested
+                    process. List of dicts with Current status of all the
+                    processes if input parameter was non-existant.
+        """
         try:
             url = self.request.uri
             wrapper_type = Wrapper.url_to_type(url)

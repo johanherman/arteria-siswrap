@@ -3,20 +3,19 @@ such as the quick report generator and quality control suite. Listens on port
 10900 for various commands. Try accessing e.g. http://localhost:10900/api/1.0
 
 Manual installation (tested with python > 2.7.6):
-    # Install the dependencies and the siswrap package
+    # Install the dependencies and the arteria-siswrap package
+    virtualenv /opt/arteria/arteria-siswrap-env
+    source /opt/arteria/arteria-siswrap-env/bin/activate
     pip install -r requirements/dev
     python setup.py install
 
-    # Or do everything in one step
-    pip install -e file://`pwd` -r requirements/dev
-
 Manual run
-    /usr/local/bin/siswrap-ws --config=./config/siswrap.config --debug
+    /opt/arteria/arteria-siswrap/bin/siswrap-ws --port 10900 --configroot ./config/ --debug
 
 Manual tests
     py.test tests/integration/rest_tests.py
 
-Setup with bells and whistles
+Setup with bells and whistles (not actively supported anymore)
     # Use the install script for installation of service and controller scripts.
     # Also runs integration tests in the end
     ./scripts/install
