@@ -48,7 +48,7 @@ class BaseSiswrapHandler(BaseRestHandler):
             reason = "OK"
 
         self.set_status(http_code, reason)
-        self.write_object(proc_info)
+        self.write_object({"process_info": proc_info})
 
     def write_accepted(self, proc_info):
         """

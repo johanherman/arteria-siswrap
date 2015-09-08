@@ -112,7 +112,7 @@ class Wrapper(object):
         Use Sisyphus own script to check which version is used.
         :return: the sisyphus version used.
         """
-        conf = self.conf_svc.get_app_config
+        conf = self.conf_svc.get_app_config()
         cmd = [conf["perl"], conf["version_bin"]]
         sisphus_version = check_output(cmd)
         return sisphus_version
