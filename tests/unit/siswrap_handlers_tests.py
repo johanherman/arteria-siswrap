@@ -31,6 +31,13 @@ def stub_isdir(monkeypatch):
 
     monkeypatch.setattr("os.path.isdir", my_isdir)
 
+@pytest.fixture
+def stub_sisyphus_version(monkeypatch):
+    def my_sisyphus_version(self):
+        return "15.3.2"
+
+    monkeypatch.setattr("siswrap.wrapper_services.Wrapper.sisyphus_version", my_sisyphus_version)
+
 def json(payload):
     return jsonpickle.encode(payload)
 
@@ -38,13 +45,16 @@ def json(payload):
 class TestRunHandler(object):
 
     @pytest.mark.gen_test
-    def test_post_job(self, http_client, http_server, base_url, stub_isdir):
+    def test_post_job(self, http_client, http_server, base_url, stub_isdir, stub_sisyphus_version):
         payload = {"runfolder": "foo"}
         resp = yield http_client.fetch(base_url + API_URL + "/report/run/123",
                                        method="POST", body=json(payload))
 
         assert resp.code == 202
         payload = jsonpickle.decode(resp.body)
+        assert payload["sisyphus_version"] == "15.3.2"
+        from siswrap import __version__ as version
+        assert payload["service_version"] == version
         assert payload["runfolder"] == "/data/testarteria1/mon1/foo"
 
 
@@ -61,11 +71,9 @@ class TestStatusHandler(object):
 
         resp = yield http_client.fetch(base_url + API_URL + "/report/status/")
         assert resp.code == 200
-        assert len(resp.body) == 2  # [ and ]
 
         resp = yield http_client.fetch(base_url + API_URL + "/qc/status/")
         assert resp.code == 200
-        assert len(resp.body) == 2
 
     @pytest.mark.gen_test
     def test_get_global_filled_status(self, http_client, http_server,
@@ -82,8 +90,8 @@ class TestStatusHandler(object):
         resp = yield http_client.fetch(base_url + API_URL + "/report/status/")
         assert resp.code == 200
         payload = jsonpickle.decode(resp.body)
-        assert payload[0]["pid"] == 4242
-        assert payload[1]["pid"] == 3131
+        assert payload["process_info"][0]["pid"] == 4242
+        assert payload["process_info"][1]["pid"] == 3131
 
     @pytest.mark.gen_test
     def test_get_existing_status(self, http_client, http_server,
@@ -100,13 +108,14 @@ class TestStatusHandler(object):
                                        "/report/status/123")
         assert resp.code == 200
         payload = jsonpickle.decode(resp.body)
-        assert payload["pid"] == 123
-        assert payload["state"] == State.STARTED
+        print payload
+        assert payload["process_info"]["pid"] == 123
+        assert payload["process_info"]["state"] == State.STARTED
 
         resp = yield http_client.fetch(base_url + API_URL + "/qc/status/321")
         assert resp.code == 200
         payload = jsonpickle.decode(resp.body)
-        assert payload["pid"] == 321
+        assert payload["process_info"]["pid"] == 321
 
     @pytest.mark.gen_test
     def test_get_invalid_status(self, http_client, http_server,

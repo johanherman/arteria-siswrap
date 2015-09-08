@@ -1,6 +1,7 @@
 import os.path
 import socket
 import subprocess
+from subprocess import check_output
 import logging
 from arteria.web.state import State
 
@@ -105,6 +106,16 @@ class Wrapper(object):
 
     def __get_attr__(self, attr):
         return getattr(self.info, attr)
+
+    def sisyphus_version(self):
+        """
+        Use Sisyphus own script to check which version is used.
+        :return: the sisyphus version used.
+        """
+        conf = self.conf_svc.get_app_config()
+        cmd = [conf["perl"], conf["version_bin"]]
+        sisphus_version = check_output(cmd)
+        return sisphus_version
 
     # TODO: Perhaps implement support for stopping running process.
     def stop(self):
