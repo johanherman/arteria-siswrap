@@ -3,6 +3,7 @@ import arteria
 from arteria.web.handlers import BaseRestHandler
 from arteria.web.state import State
 from wrapper_services import ProcessService, Wrapper, ProcessInfo
+from siswrap import __version__ as version
 
 
 class BaseSiswrapHandler(BaseRestHandler):
@@ -112,6 +113,8 @@ class RunHandler(BaseSiswrapHandler):
             wrapper_type = Wrapper.url_to_type(url)
             wrapper = Wrapper.new_wrapper(wrapper_type, str(runfolder),
                                           self.config_svc)
+            sisyphus_version = wrapper.sisyphus_version()
+            my_version = version
             result = self.process_svc.run(wrapper)
 
             self.append_status_link(result)
@@ -120,7 +123,9 @@ class RunHandler(BaseSiswrapHandler):
                     "host": result.info.host,
                     "runfolder": result.info.runfolder,
                     "link": result.info.link,
-                    "msg": result.info.msg}
+                    "msg": result.info.msg,
+                    "service_version": my_version,
+                    "sisyphus_version": sisyphus_version}
             self.write_accepted(resp)
         except RuntimeError, err:
             self.write_object("An error ocurred: " + str(err),
