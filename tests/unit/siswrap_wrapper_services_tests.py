@@ -3,6 +3,7 @@ from arteria.configuration import ConfigurationService
 from arteria.web.state import State
 from siswrap.handlers import *
 from siswrap.wrapper_services import *
+from siswrap_test_helpers import *
 
 # Some tests for siswrap/wrapper_services.py.
 
@@ -52,6 +53,8 @@ class TestProcessInfo(object):
 # Mini helper class for some of the tests
 class Helper(object):
     runfolder = "foo"
+    params = {"runfolder": runfolder}
+    qcparams = {"runfolder": runfolder, "qc_config": TestHelpers.QC_CONFIG}
     conf = ConfigurationService(app_config_path="./config/app.config")
     root = conf.get_app_config()["runfolder_root"]
     # root = "/tmp"
@@ -78,14 +81,16 @@ class TestReportWrapper(object):
 
     # The ReportWrapper class should be setup properly
     def test_creation(self, stub_isdir):
-        report = ReportWrapper(Helper.runfolder, Helper.conf)
+        report = ReportWrapper(Helper.params, Helper.conf)
+        assert report.binary_conf_lookup == "report_bin"
+        assert report.type_txt == Wrapper.REPORT_TYPE
         assert isinstance(report.conf_svc, ConfigurationService) is True
 
     # We should be able to access the ProcessInfo's attributes
     def test_info_attr(self, stub_isdir):
-        report = ReportWrapper(Helper.runfolder, Helper.conf)
+        report = ReportWrapper(Helper.params, Helper.conf)
         assert isinstance(report.info, ProcessInfo) is True
-        assert report.info.runfolder == Helper.root + Helper.runfolder
+        assert report.info.runfolder == Helper.root + "/" + Helper.runfolder
 
     # And we should inherit from the base Wrapper class
     def test_inheritance(self, stub_isdir):
@@ -96,7 +101,7 @@ class TestWrapper(object):
 
     # Wrapper base class should be setup properly
     def test_creation(self, stub_isdir):
-        wrapper = Wrapper(Helper.runfolder, Helper.conf)
+        wrapper = Wrapper(Helper.params, Helper.conf)
 
         assert isinstance(wrapper.info, ProcessInfo) is True
         assert isinstance(wrapper.conf_svc, ConfigurationService) is True
@@ -118,7 +123,7 @@ class TestWrapper(object):
                     self.text = ["/bin/uggla"]
 
         monkeypatch.setattr("siswrap.wrapper_services.ExecString", MockedExecString)
-        w = Wrapper(Helper.runfolder, Helper.conf)
+        w = Wrapper(Helper.params, Helper.conf)
         w.run()
 
         assert isinstance(w.info.proc, subprocess.Popen)
@@ -134,16 +139,16 @@ class TestWrapper(object):
     # Helper method should return the correct wrapper object for
     # different text inputs
     def test_new_wrapper(self, stub_isdir):
-        qc_wrap = Wrapper.new_wrapper("qc", Helper.runfolder,
+        qc_wrap = Wrapper.new_wrapper("qc", Helper.params,
                                       Helper.conf)
-        report_wrap = Wrapper.new_wrapper("report", Helper.runfolder,
+        report_wrap = Wrapper.new_wrapper("report", Helper.params,
                                           Helper.conf)
 
         assert qc_wrap.type_txt == "qc"
         assert report_wrap.type_txt == "report"
 
         with pytest.raises(Exception) as err:
-            Wrapper.new_wrapper("foo", Helper.runfolder,
+            Wrapper.new_wrapper("foo", Helper.params,
                                 Helper.conf)
 
     # Helper method should return the correct wrapper type in text
@@ -161,50 +166,53 @@ class TestWrapper(object):
         with pytest.raises(Exception) as err:
             Wrapper.url_to_type("foo")
 
+    def test_write_new_config_file(self, monkeypatch):
+        path = "/tmp/siswrap_test_sisyphus.yml"
+        content = TestHelpers.SISYPHUS_CONFIG
+        Wrapper.write_new_config_file(path, content)
+
+        assert os.path.exists(path) is True
+        with open(path) as f:
+            assert f.read() == TestHelpers.SISYPHUS_CONFIG
+
+        def my_move(src, dst):
+            assert src == path
+            assert path in dst
+            return True
+
+        monkeypatch.setattr("shutil.move", my_move)
+        Wrapper.write_new_config_file(path, content)
+
+        os.remove(path)
+
+@pytest.fixture
+def stub_new_qc_config(monkeypatch):
+    def my_new_conf(self, path, content):
+        assert path == Helper.root + "/" + Helper.runfolder + "/sisyphus_qc.xml"
+        assert content == TestHelpers.QC_CONFIG
+        return True
+
+    monkeypatch.setattr("siswrap.wrapper_services.Wrapper.write_new_config_file", my_new_conf)
+
 
 class TestQCWrapper(object):
 
     # QCWrapper should be setup correctly
-    def test_creation(self, stub_isdir, monkeypatch):
-        qc = QCWrapper(Helper.runfolder, Helper.conf)
+    def test_creation(self, stub_isdir, stub_new_qc_config):
+        qc = QCWrapper(Helper.qcparams, Helper.conf)
         assert isinstance(qc.info, ProcessInfo) is True
         assert isinstance(qc.conf_svc, ConfigurationService) is True
 
-        # test the file copy
-        dstdir = "/tmp/test_siswrap/runfolder_root/"
-        testsrc = dstdir + "qc_file.txt"
-
-        def mocked_get_config(self):
-            return {"qc_file": testsrc, "runfolder_root": dstdir}
-
-        # Create the test src file, ignore error if it exists
-        import io
-        try:
-            os.makedirs(dstdir + Helper.runfolder)
-            io.open(testsrc, 'a').close()
-        except:
-            pass
-
-        monkeypatch.setattr("arteria.configuration.ConfigurationService.get_app_config",
-                            mocked_get_config)
-        qc = QCWrapper(Helper.runfolder, Helper.conf)
-        assert os.path.exists(dstdir + Helper.runfolder +
-                              "/sisyphus_qc.xml") is True
-
-        # remove the files
-        import shutil
-        shutil.rmtree(dstdir)
 
     # QCWrapper should be able to get the attributes from ProcessInfo
     def test_info_attr(self, stub_isdir):
-        qc = QCWrapper(Helper.runfolder, Helper.conf)
+        qc = QCWrapper(Helper.params, Helper.conf)
         assert isinstance(qc.info, ProcessInfo) is True
-        assert qc.info.runfolder == Helper.root + Helper.runfolder
+        assert qc.info.runfolder == Helper.root + "/" + Helper.runfolder
 
     # QCWrapper should inherit Wrapper
     def test_inheritance(self):
         assert issubclass(QCWrapper, Wrapper) is True
-
 
 class TestExecString(object):
 
