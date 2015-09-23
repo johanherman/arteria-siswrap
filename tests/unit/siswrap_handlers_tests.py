@@ -63,7 +63,6 @@ class TestRunHandler(object):
     @pytest.mark.gen_test
     def test_post_report_job(self, http_client, http_server, base_url, stub_isdir, stub_sisyphus_version, stub_new_sisyphus_conf):
         payload = {"runfolder": "foo", "sisyphus_config": TestHelpers.SISYPHUS_CONFIG}
-
         resp = yield http_client.fetch(base_url + API_URL + "/report/run/123",
                                        method="POST", body=json(payload))
 
@@ -74,10 +73,15 @@ class TestRunHandler(object):
         assert payload["service_version"] == version
         assert payload["runfolder"] == "/data/testarteria1/mon1/foo"
 
+        # Test empty input for sisyphus_conf field; the asserts in my_new_config
+        # should not be run if we sent this in.
+        payload = {"runfolder": "foo", "sisyphus_config": " "}
+        resp = yield http_client.fetch(base_url + API_URL + "/report/run/123",
+                                       method="POST", body=json(payload))
+
     @pytest.mark.gen_test
     def test_post_qc_job(self, http_client, http_server, base_url, stub_isdir, stub_sisyphus_version, stub_new_qc_conf):
         payload = {"runfolder": "foo", "qc_config": TestHelpers.QC_CONFIG}
-
         resp = yield http_client.fetch(base_url + API_URL + "/qc/run/123",
                                        method="POST", body=json(payload))
 
@@ -88,6 +92,14 @@ class TestRunHandler(object):
         assert payload["service_version"] == version
         assert payload["runfolder"] == "/data/testarteria1/mon1/foo"
 
+        # Test empty input for sisyphus_conf field; the asserts in my_new_config
+        # should not be run if we sent this in, but we should receive an http error 500.
+        payload = {"runfolder": "foo", "qc_config": " "}
+        try:
+            resp = yield http_client.fetch(base_url + API_URL + "/qc/run/123",
+                                            method="POST", body=json(payload))
+        except tornado.httpclient.HTTPError, err:
+            assert "500" in str(err)
 
 class TestStatusHandler(object):
 

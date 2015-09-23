@@ -1,6 +1,7 @@
 import jsonpickle
 import json
 import arteria
+import tornado.web
 from arteria.web.handlers import BaseRestHandler
 from arteria.web.state import State
 from wrapper_services import ProcessService, Wrapper, ProcessInfo
@@ -106,11 +107,14 @@ class RunHandler(BaseSiswrapHandler):
         params["runfolder"] = body["runfolder"].strip()
 
         if wrapper_type == "qc":
-            params["qc_config"] = body["qc_config"].strip()
+            if body["qc_config"].strip():
+                params["qc_config"] = body["qc_config"].strip()
+            else:
+                raise RuntimeError("qc_config can't be empty value!")
 
         body = json.loads(self.request.body)
 
-        if "sisyphus_config" in body:
+        if "sisyphus_config" in body and body["sisyphus_config"].strip():
             params["sisyphus_config"] = body["sisyphus_config"].strip()
 
         return params
@@ -156,8 +160,7 @@ class RunHandler(BaseSiswrapHandler):
 
             self.write_accepted(resp)
         except RuntimeError, err:
-            self.write_object("An error ocurred: " + str(err),
-                              http_code=500, reason="An error occurred")
+            raise tornado.web.HTTPError(500, "An error occurred: {0}".format(str(err)))
 
 
 class StatusHandler(BaseSiswrapHandler):
@@ -202,4 +205,4 @@ class StatusHandler(BaseSiswrapHandler):
                 # processes of the specific wrapper type
                 self.write_status({"statuses": self.process_svc.get_all(wrapper_type)})
         except RuntimeError, err:
-            self.write_object("An error occurred: " + str(err))
+            raise tornado.web.HTTPError(500, "An error occurred: {0}".format(str(err)))
