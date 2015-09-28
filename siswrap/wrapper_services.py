@@ -1,6 +1,8 @@
 import os.path
 import socket
 import subprocess
+import shutil
+import datetime
 from subprocess import check_output
 import logging
 from arteria.web.state import State
@@ -83,29 +85,67 @@ class Wrapper(object):
         QualityControl at the moment).
 
         Args:
-            runfolder: the name of the runfolder to use (not full path)
-            configuration_svc: the ConfigurationService for our config lookups
-            logger: logger object for printouts
+            params: Dict of parameters to the wrapper. Must contain the name of
+                    the runfolder to use (not full path). Can contain a YAML
+                    object containing the Sisyphus config to use, and a XML
+                    object cotaining the QC config to use.
+            configuration_svc: The ConfigurationService for our config lookups
+            logger: Logger object for printouts
 
-        FIXME: Raises
+        Raises:
+            OSError: If the given runfolder doesn't exist.
     """
 
     QC_TYPE = "qc"
     REPORT_TYPE = "report"
 
-    def __init__(self, runfolder, configuration_svc, logger=None):
+    def __init__(self, params, configuration_svc, logger=None):
+        self.conf_svc = configuration_svc
+        self.logger = logger or logging.getLogger(__name__)
+
         conf = configuration_svc.get_app_config()
-        runpath = conf["runfolder_root"] + runfolder
+        runpath = conf["runfolder_root"] + "/" + params["runfolder"]
 
         if not os.path.isdir(runpath):
             raise OSError("No runfolder {0} exists.".format(runpath))
 
         self.info = ProcessInfo(runpath)
-        self.conf_svc = configuration_svc
-        self.logger = logger or logging.getLogger(__name__)
+
+        if "sisyphus_config" in params:
+            path = runpath + "/sisyphus.yml"
+            self.write_new_config_file(path, params["sisyphus_config"])
+
 
     def __get_attr__(self, attr):
         return getattr(self.info, attr)
+
+    @staticmethod
+    def write_new_config_file(path, content):
+        """ Writes new config file (especially used for Sisyphus YAML and QC XML).
+            If the file already exists a backup copy will be created.
+
+            Args:
+                - path: The path to the config file that should be written.
+                - content: The content of the new config file.
+        """
+        try:
+            logger = logging.getLogger(__name__)
+
+            logger.debug("Writing new config file " + path)
+
+            now = datetime.datetime.now().isoformat()
+
+            if os.path.isfile(path):
+                logger.debug("Config file already existed. Making backup copy.")
+                shutil.move(path, path + "." + now)
+
+            with open(path, "w") as f:
+                f.write(content)
+
+        except OSError, err:
+            logger.error("Error writing new config file {0}: {1}".
+                              format(path, err))
+
 
     def sisyphus_version(self):
         """
@@ -178,24 +218,29 @@ class ReportWrapper(Wrapper):
         base class Wrapper.
 
         Args:
-            runfolder: the runfolder to start processing (not full path)
+            params: Dict of parameters to the wrapper. Must contain the name of
+                    the runfolder to use (not full path). Can contain a YAML
+                    object containing the Sisyphus config to use.
             configuration_svc: the ConfigurationService for our conf lookups
             logger: the Logger object in charge of logging output
     """
 
-    def __init__(self, runfolder, configuration_svc):
-        super(ReportWrapper, self).__init__(runfolder,
-                                            configuration_svc)
+    def __init__(self, params, configuration_svc, logger=None):
+        super(ReportWrapper, self).__init__(params, configuration_svc, logger)
         self.binary_conf_lookup = "report_bin"
         self.type_txt = Wrapper.REPORT_TYPE
-
 
 class QCWrapper(Wrapper):
     """ Wrapper around the QualityControl perl script. Inherits behaviour from
         its base class Wrapper.
 
          Args:
-             runfolder: the runfolder to start processing (not full path)
+            params: Dict of parameters to the wrapper. Must contain the name of
+                    the runfolder to use (not full path). Can contain a YAML
+                    object containing the Sisyphus config to use, and a XML
+                    object containing the QC config to use. If a config is given
+                    then they will be written to the runfolder where Sisyphus
+                    will be able to use them.
              configuration_svc: ConfigurationService serving our conf lookups
              logger: the Logger object in charge of logging output
 
@@ -203,23 +248,15 @@ class QCWrapper(Wrapper):
             IOError: if we couldn't copy the QC settings input file
      """
 
-    def __init__(self, runfolder, configuration_svc, logger=None):
-        super(QCWrapper, self).__init__(runfolder, configuration_svc)
+    def __init__(self, params, configuration_svc, logger=None):
+        super(QCWrapper, self).__init__(params, configuration_svc, logger)
         self.binary_conf_lookup = "qc_bin"
         self.type_txt = Wrapper.QC_TYPE
-        self.logger = logger or logging.getLogger(__name__)
+        conf = self.conf_svc.get_app_config()
 
-        try:
-            # Copy QC settings file from central server location (provisioned
-            # from elsewhere) to current runfolder destination
-            import shutil
-            conf = self.conf_svc.get_app_config()
-            src = conf["qc_file"]
-            dst = conf["runfolder_root"] + runfolder + "/sisyphus_qc.xml"
-            shutil.copyfile(src, dst)
-        except IOError, err:
-            self.logger.error("Couldn't copy file {0} to {1}: {2}".
-                              format(src, dst, err))
+        if "qc_config" in params:
+            path = conf["runfolder_root"] + "/" + params["runfolder"] + "/sisyphus_qc.xml"
+            self.write_new_config_file(path, params["qc_config"])
 
 
 class ProcessService(object):
@@ -386,8 +423,8 @@ class ProcessService(object):
                 wrapper_type: the object type to check statuses for
 
             Returns:
-                a list of processes and some meta information if they are running, otherwise
-                an empty list
+                a dict of processes and some meta information if they are running, otherwise
+                an empty dict
         """
         # Only update processes of our requested wrapper class
         map(lambda pid: self.poll_process(pid)

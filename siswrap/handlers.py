@@ -1,9 +1,11 @@
 import jsonpickle
+import json
 import arteria
+import tornado.web
 from arteria.web.handlers import BaseRestHandler
 from arteria.web.state import State
 from wrapper_services import ProcessService, Wrapper, ProcessInfo
-from siswrap import __version__ as version
+from siswrap import __version__ as siswrap_version
 
 
 class BaseSiswrapHandler(BaseRestHandler):
@@ -31,18 +33,14 @@ class BaseSiswrapHandler(BaseRestHandler):
         reason = "OK"
 
         # Write output for specific process
-        if type(proc_info) is dict:
-            state = proc_info.get("state")
+        state = proc_info.get("state")
 
-            if state == State.STARTED:
-                reason = "OK - still processing"
-            elif state == State.DONE:
-                reason = "OK - finished processing"
-            elif state == State.ERROR:
-                reason = "OK - but an error occured while processing"
-            else:
-                http_code = self.HTTP_ERROR
-                reason = "An unexpected error occured"
+        if state == State.STARTED:
+            reason = "OK - still processing"
+        elif state == State.DONE:
+            reason = "OK - finished processing"
+        elif state == State.ERROR:
+            reason = "OK - but an error occured while processing"
         # Write output for all processes
         else:
             reason = "OK"
@@ -84,13 +82,54 @@ class RunHandler(BaseSiswrapHandler):
     """ Our handler for requesting the launch of a new quick report and
         quality control.
     """
+
+    def setup_wrapper_parameters(self, wrapper_type):
+        """ Setups the input parameters to the wrapper type in question by
+            parsing the HTTP request body.
+
+            Args:
+                wrapper_type: specifies whether or not to look for a qc_config
+                              in the body.
+
+            Returns:
+                A dict with the runfolder, and if given: the Sisyphus config and
+                the QC config.
+        """
+
+        params = {}
+        expect_param = ["runfolder"]
+
+        if wrapper_type == "qc":
+            expect_param = expect_param + ["qc_config"]
+
+        body = self.body_as_object(expect_param)
+
+        params["runfolder"] = body["runfolder"].strip()
+
+        if wrapper_type == "qc":
+            if body["qc_config"].strip():
+                params["qc_config"] = body["qc_config"].strip()
+            else:
+                raise RuntimeError("qc_config can't be empty value!")
+
+        body = json.loads(self.request.body)
+
+        if "sisyphus_config" in body and body["sisyphus_config"].strip():
+            params["sisyphus_config"] = body["sisyphus_config"].strip()
+
+        return params
+
     def post(self, runfolder="/some/runfolder"):
         """ Start running Sisyphus quick report or quality control for specific
             runfolder.
 
             Args:
                 runfolder: Which runfolder to generate a report or quality
-                           control for.
+                           control for. (mandatory)
+                qc_config: Supply a custom QC XML config file that will be copied into
+                           Sisyphus root folder (mandatory for QC actions)
+                sisyphus_config: Supply a custom YAML config file that will overwrite then
+                                 default bundled in Sisyphus. (optional)
 
             Returns:
                 A status code HTTP 202 if the report generation or quality control
@@ -103,18 +142,10 @@ class RunHandler(BaseSiswrapHandler):
         """
         try:
             url = self.request.uri.strip()
-
-            expect_param = ["runfolder"]
-            body = self.body_as_object(expect_param)
-            runfolder = body["runfolder"].strip()
-
-            # Return a new wrapper object depending on what was requested in
-            # the URL, and then ask the process service to start execution.
             wrapper_type = Wrapper.url_to_type(url)
-            wrapper = Wrapper.new_wrapper(wrapper_type, str(runfolder),
-                                          self.config_svc)
-            sisyphus_version = wrapper.sisyphus_version()
-            my_version = version
+            wrapper_params = self.setup_wrapper_parameters(wrapper_type)
+
+            wrapper = Wrapper.new_wrapper(wrapper_type, wrapper_params, self.config_svc)
             result = self.process_svc.run(wrapper)
 
             self.append_status_link(result)
@@ -124,12 +155,12 @@ class RunHandler(BaseSiswrapHandler):
                     "runfolder": result.info.runfolder,
                     "link": result.info.link,
                     "msg": result.info.msg,
-                    "service_version": my_version,
-                    "sisyphus_version": sisyphus_version}
+                    "service_version": siswrap_version,
+                    "sisyphus_version": wrapper.sisyphus_version()}
+
             self.write_accepted(resp)
         except RuntimeError, err:
-            self.write_object("An error ocurred: " + str(err),
-                              http_code=500, reason="An error occurred")
+            raise tornado.web.HTTPError(500, "An error occurred: {0}".format(str(err)))
 
 
 class StatusHandler(BaseSiswrapHandler):
@@ -172,6 +203,6 @@ class StatusHandler(BaseSiswrapHandler):
             else:
                 # If a specific PID wasn't requested then return all
                 # processes of the specific wrapper type
-                self.write_status(self.process_svc.get_all(wrapper_type))
+                self.write_status({"statuses": self.process_svc.get_all(wrapper_type)})
         except RuntimeError, err:
-            self.write_object("An error occurred: " + str(err))
+            raise tornado.web.HTTPError(500, "An error occurred: {0}".format(str(err)))
