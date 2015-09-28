@@ -1,13 +1,3 @@
-#import pytest
-#import tornado.web
-#import jsonpickle
-#from arteria import *
-#from arteria.configuration import ConfigurationService
-#from siswrap.app import *
-#from siswrap.handlers import *
-#from siswrap.wrapper_services import *
-
-
 class TestHelpers(object):
 
     SISYPHUS_CONFIG = """MISMATCH:

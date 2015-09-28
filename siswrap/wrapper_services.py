@@ -1,6 +1,8 @@
 import os.path
 import socket
 import subprocess
+import shutil
+import datetime
 from subprocess import check_output
 import logging
 from arteria.web.state import State
@@ -127,9 +129,6 @@ class Wrapper(object):
                 - content: The content of the new config file.
         """
         try:
-            import shutil
-            import datetime
-
             logger = logging.getLogger(__name__)
 
             logger.debug("Writing new config file " + path)
