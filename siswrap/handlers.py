@@ -108,14 +108,14 @@ class RunHandler(BaseSiswrapHandler):
 
         if wrapper_type == "qc":
             if body["qc_config"].strip():
-                params["qc_config"] = body["qc_config"].strip()
+                params["qc_config"] = body["qc_config"]
             else:
                 raise RuntimeError("qc_config can't be empty value!")
 
         body = json.loads(self.request.body)
 
         if "sisyphus_config" in body and body["sisyphus_config"].strip():
-            params["sisyphus_config"] = body["sisyphus_config"].strip()
+            params["sisyphus_config"] = body["sisyphus_config"]
 
         return params
 
