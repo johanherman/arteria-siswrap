@@ -2,7 +2,7 @@ import os.path
 import socket
 import subprocess
 import shutil
-import datetime
+import time
 from subprocess import check_output
 import logging
 from arteria.web.state import State
@@ -133,7 +133,7 @@ class Wrapper(object):
 
             logger.debug("Writing new config file " + path)
 
-            now = datetime.datetime.now().isoformat()
+            now = time.strftime("%Y%m%d-%H%M%S")
 
             if os.path.isfile(path):
                 logger.debug("Config file already existed. Making backup copy.")
