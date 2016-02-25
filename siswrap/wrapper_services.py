@@ -357,9 +357,11 @@ class ProcessService(object):
                 # killed off.
                 if wrapper.info.state is not State.ERROR:
                     out, err = proc.communicate()
-                    wrapper.info.msg = ("Process was completed successfully, "
+                    wrapper.info.msg = {"message": "Process was completed successfully, "
                                         "but encounted an error, with return "
-                                        "code {0}.").format(returncode)
+                                        "code {}.".format(returncode),
+                                        "stdout": out,
+                                        "stderr": err}
                     debugmsg = "Message was: " + err
                     wrapper.info.state = State.ERROR
             except OSError, err:
@@ -380,7 +382,7 @@ class ProcessService(object):
 
     def get_status(self, pid, wrapper_type):
         """ Get status of a specific process. Removes the pid from the queue
-            if the proecess has finished executing.
+            if the process has finished executing.
 
             Args:
                 pid: the pid of the process to check for

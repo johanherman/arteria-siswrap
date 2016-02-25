@@ -10,6 +10,14 @@ from siswrap.siswrap import ProcessService
 # Recommended to have the environment variable ARTERIA_TEST set to 1
 # for the siswrap-wsd to test with a 1 min long running process
 
+#--------------------------------------------------
+# NOTE
+# These tests have not been maintained - and need
+# to be update before using them.
+# We should consider removing them in the future unless
+# they are updated.
+# /JD 20160224
+#--------------------------------------------------
 
 class TestRestApi(object):
     BASE_URL = "http://localhost:10900/api/1.0"
