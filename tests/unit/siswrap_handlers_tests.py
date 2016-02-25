@@ -161,6 +161,36 @@ class TestStatusHandler(object):
         assert payload["pid"] == 321
 
     @pytest.mark.gen_test
+    def test_get_existing_status_with_error_in_process(self, http_client, http_server,
+                                 base_url, monkeypatch, stub_isdir):
+
+        message_from_process = {"msg": "My message",
+                                "stdout": "Stdout stuff",
+                                "stderr": "This was some error from stderr"}
+
+        def my_get_with_error(self, pid, wrapper_type):
+            return ProcessInfo(runfolder="foo", host="bar",
+                               state=State.ERROR,
+                               proc=None, msg=message_from_process, pid=pid)
+
+        monkeypatch.setattr("siswrap.wrapper_services.ProcessService.get_status",
+                            my_get_with_error)
+
+        resp = yield http_client.fetch(base_url + API_URL +
+                                       "/report/status/123")
+        assert resp.code == 200
+        payload = jsonpickle.decode(resp.body)
+        print payload
+        assert payload["pid"] == 123
+        assert payload["state"] == State.ERROR
+        assert payload["msg"] == message_from_process
+
+        resp = yield http_client.fetch(base_url + API_URL + "/qc/status/321")
+        assert resp.code == 200
+        payload = jsonpickle.decode(resp.body)
+        assert payload["pid"] == 321
+
+    @pytest.mark.gen_test
     def test_get_invalid_status(self, http_client, http_server,
                                 base_url, monkeypatch, stub_isdir):
         def my_get(self, pid, wrapper_type):

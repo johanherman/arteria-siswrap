@@ -349,6 +349,44 @@ class TestProcessService(object):
         assert res.pid == 4242
         assert res.state == State.STARTED
 
+    def test_polling_get_stdout_stderr(self, monkeypatch):
+
+        class WrapperStub(Wrapper):
+            def __init__(self, cmd):
+                self.info = ProcessInfo()
+                self.type_txt = "wrapper_stub"
+                self.cmd = cmd
+
+            def run(self):
+                this_proc = subprocess.Popen(self.cmd, stdout=subprocess.PIPE,
+                                             stderr=subprocess.PIPE, shell=True)
+                self.info.proc = this_proc
+                self.info.pid = this_proc.pid
+
+        def run_test_with_wrapper(wrapper):
+
+            ps = ProcessService(Helper.proc_svc.conf_svc)
+            ps.run(wrapper)
+
+            # Keep trying to get the status 100 times.
+            i = 0
+            while True and i < 100:
+                i += 1
+                result = ps.get_status(wrapper.info.pid, "wrapper_stub")
+                if not result.state == State.STARTED:
+                    break
+
+            return result
+
+        test_stderr_wrapper = WrapperStub(["ech", "Hello World"])
+        result_std_err = run_test_with_wrapper(test_stderr_wrapper)
+        assert result_std_err.msg.get("stderr").strip() == "Hello World: 1: Hello World: ech: not found"
+
+        test_stdout_wrapper = WrapperStub("echo Hello World && echo Hello Human 1>&2 && false")
+        result_std_out = run_test_with_wrapper(test_stdout_wrapper)
+        assert result_std_out.msg.get("stdout").strip() == "Hello World"
+        assert result_std_out.msg.get("stderr").strip() == "Hello Human"
+
     # Test that we can check the status of a specific process in the
     # process queue
     def test_status(self, monkeypatch):
