@@ -11,7 +11,7 @@ def start():
     # be based on the doc strings of the get/post/put/delete methods
     args = dict(process_svc=process_svc, config_svc=app_svc.config_svc)
     routes = [
-        (r"/api/1.0/(?:qc|report)/run/([\w_-]+)", RunHandler, args),
-        (r"/api/1.0/(?:qc|report)/status/(\d*)", StatusHandler, args)
+        (r"/api/1.0/(?:qc|report|aeacus-stats|aeacus-reports)/run/([\w_-]+)", RunHandler, args),
+        (r"/api/1.0/(?:qc|report|aeacus-stats|aeacus-reports)/status/(\d*)", StatusHandler, args)
     ]
     app_svc.start(routes)

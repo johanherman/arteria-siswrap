@@ -98,6 +98,8 @@ class Wrapper(object):
 
     QC_TYPE = "qc"
     REPORT_TYPE = "report"
+    AEACUS_STATS_TYPE = "aeacus-stats"
+    AEACUS_REPORTS_TYPE = "aeacus-reports"
 
     def __init__(self, params, configuration_svc, logger=None):
         self.conf_svc = configuration_svc
@@ -195,6 +197,10 @@ class Wrapper(object):
             return Wrapper.QC_TYPE
         elif Wrapper.REPORT_TYPE in url:
             return Wrapper.REPORT_TYPE
+        elif Wrapper.AEACUS_STATS_TYPE in url:
+            return Wrapper.AEACUS_STATS_TYPE
+        elif Wrapper.AEACUS_REPORTS_TYPE in url:
+            return Wrapper.AEACUS_REPORTS_TYPE
         else:
             raise RuntimeError("Unknown wrapper runner requested: {0}".
                                format(url))
@@ -208,10 +214,49 @@ class Wrapper(object):
             return QCWrapper(runfolder, configuration_svc)
         elif wrapper_type == Wrapper.REPORT_TYPE:
             return ReportWrapper(runfolder, configuration_svc)
+        elif wrapper_type == Wrapper.AEACUS_STATS_TYPE:
+            return AeacusStatsWrapper(runfolder, configuration_svc)
+        elif wrapper_type == Wrapper.AEACUS_REPORTS_TYPE:
+            return AeacusReportsWrapper(runfolder, configuration_svc)
         else:
             raise RuntimeError("Unknown wrapper runner requested: {0}".
                                format(wrapper_type))
 
+
+class AeacusStatsWrapper(Wrapper):
+    """ Wrapper around the aeacus-stats perl script. Inherits behaviour from its
+        base class Wrapper.
+
+        Args:
+            params: Dict of parameters to the wrapper. Must contain the name of
+                    the runfolder to use (not full path). Can contain a YAML
+                    object containing the Sisyphus config to use.
+            configuration_svc: the ConfigurationService for our conf lookups
+            logger: the Logger object in charge of logging output
+    """
+
+    def __init__(self, params, configuration_svc, logger=None):
+        super(ReportWrapper, self).__init__(params, configuration_svc, logger)
+        self.binary_conf_lookup = "aeacus_stats"
+        self.type_txt = Wrapper.AEACUS_STATS_TYPE
+
+
+class AeacusReportsWrapper(Wrapper):
+    """ Wrapper around the aeacus-reports perl script. Inherits behaviour from its
+        base class Wrapper.
+
+        Args:
+            params: Dict of parameters to the wrapper. Must contain the name of
+                    the runfolder to use (not full path). Can contain a YAML
+                    object containing the Sisyphus config to use.
+            configuration_svc: the ConfigurationService for our conf lookups
+            logger: the Logger object in charge of logging output
+    """
+
+    def __init__(self, params, configuration_svc, logger=None):
+        super(ReportWrapper, self).__init__(params, configuration_svc, logger)
+        self.binary_conf_lookup = "aeacus_reports"
+        self.type_txt = Wrapper.AEACUS_REPORTS_TYPE
 
 class ReportWrapper(Wrapper):
     """ Wrapper around the QuickReport perl script. Inherits behaviour from its
