@@ -3,6 +3,7 @@ import socket
 import subprocess
 import shutil
 import time
+import re
 from subprocess import check_output
 import logging
 from arteria.web.state import State
@@ -98,8 +99,8 @@ class Wrapper(object):
 
     QC_TYPE = "qc"
     REPORT_TYPE = "report"
-    AEACUS_STATS_TYPE = "aeacus-stats"
-    AEACUS_REPORTS_TYPE = "aeacus-reports"
+    AEACUS_STATS_TYPE = "aeacusstats"
+    AEACUS_REPORTS_TYPE = "aeacusreports"
 
     def __init__(self, params, configuration_svc, logger=None):
         self.conf_svc = configuration_svc
@@ -192,14 +193,17 @@ class Wrapper(object):
     def url_to_type(url):
         """ Helper method to see which wrapper object might belong to which URL.
         """
-        # TODO: Take out the correct part of the URL instead.
-        if Wrapper.QC_TYPE in url:
+
+        url_pattern = "\/api/\d.\d\/(\w+)\/"
+        first_match = re.search(url_pattern, url).group(1)
+
+        if first_match == Wrapper.QC_TYPE:
             return Wrapper.QC_TYPE
-        elif Wrapper.REPORT_TYPE in url:
+        elif first_match == Wrapper.REPORT_TYPE:
             return Wrapper.REPORT_TYPE
-        elif Wrapper.AEACUS_STATS_TYPE in url:
+        elif first_match == Wrapper.AEACUS_STATS_TYPE:
             return Wrapper.AEACUS_STATS_TYPE
-        elif Wrapper.AEACUS_REPORTS_TYPE in url:
+        elif first_match == Wrapper.AEACUS_REPORTS_TYPE:
             return Wrapper.AEACUS_REPORTS_TYPE
         else:
             raise RuntimeError("Unknown wrapper runner requested: {0}".
@@ -236,7 +240,7 @@ class AeacusStatsWrapper(Wrapper):
     """
 
     def __init__(self, params, configuration_svc, logger=None):
-        super(ReportWrapper, self).__init__(params, configuration_svc, logger)
+        super(AeacusStatsWrapper, self).__init__(params, configuration_svc, logger)
         self.binary_conf_lookup = "aeacus_stats"
         self.type_txt = Wrapper.AEACUS_STATS_TYPE
 
@@ -254,7 +258,7 @@ class AeacusReportsWrapper(Wrapper):
     """
 
     def __init__(self, params, configuration_svc, logger=None):
-        super(ReportWrapper, self).__init__(params, configuration_svc, logger)
+        super(AeacusReportsWrapper, self).__init__(params, configuration_svc, logger)
         self.binary_conf_lookup = "aeacus_reports"
         self.type_txt = Wrapper.AEACUS_REPORTS_TYPE
 

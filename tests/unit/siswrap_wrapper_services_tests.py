@@ -154,11 +154,14 @@ class TestWrapper(object):
     # Helper method should return the correct wrapper type in text
     # format for different URLs
     def test_url_to_type(self, stub_isdir):
-        test_urls = ["http://arteria1:1111/v1/api/qc/run/8312",
-                     "https://arteria12:3232/v2/api/report/run/3232",
-                     "http://testweb/api/1/qc/status",
-                     "http://testtest/api/v1/report/run"]
-        test_types = ["qc", "report", "qc", "report"]
+        test_urls = ["http://localhost/api/1.0/qc/run/test",
+                     "http://localhost:10900/api/1.0/qc/run/test",
+                     "http://localhost:10900/api/1.0/report/run/test",
+                     "http://localhost:10900/api/1.0/aeacusstats/run/test",
+                     "http://localhost:10900/api/1.0/aeacusreports/run/test",
+                     "http://localhost:10900/api/1.0/aeacusreports/status/31322"
+                     ]
+        test_types = ["qc", "qc", "report", "aeacusstats", "aeacusreports", "aeacusreports"]
 
         for idx, url in enumerate(test_urls):
             assert Wrapper.url_to_type(url) == test_types[idx]
