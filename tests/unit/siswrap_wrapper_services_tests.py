@@ -122,7 +122,7 @@ class TestWrapper(object):
                 else:
                     self.text = ["/bin/uggla"]
 
-        monkeypatch.setattr("siswrap.wrapper_services.ExecString", MockedExecString)
+        monkeypatch.setattr("siswrap.wrapper_services.ExecStringWithEmailConfig", MockedExecString)
         w = Wrapper(Helper.params, Helper.conf)
         w.run()
 
@@ -234,7 +234,7 @@ class TestExecString(object):
                             mocked_get_config)
 
         foobar = FooBar()
-        retobj = ExecString(foobar, Helper.conf, Helper.runfolder)
+        retobj = ExecStringWithEmailConfig(foobar, Helper.conf, Helper.runfolder)
         assert foobar.binary_conf_lookup in retobj.text
 
         # 8 elements in execstring: perl, binary, runfolder, runfolderpath,

@@ -59,9 +59,10 @@ class ProcessInfo(object):
                            msg="No such process exists")
 
 
-class ExecString(object):
+class ExecStringWithEmailConfig(object):
     """ Object for storing the string that will be executed. Content is semi
-        standardised, as the called Perl scripts almost looks the same. It will
+        standardised, as the called Perl scripts almost looks the same. With this type
+         of configuration it provides information for the sending emails. It will
         vary somewhat depending on which wrapper is creating the object.
 
          Args:
@@ -79,6 +80,27 @@ class ExecString(object):
         conf = conf_svc.get_app_config()
         self.text = [conf["perl"], conf[bin_lookup], "-runfolder", runfolder,
                      "-mail", conf["receiver"], "-sender", conf["sender"]]
+
+
+class ExecStringBasic(object):
+    """ Object for storing the string that will be executed. Content is semi
+        standardised, as the called Perl scripts almost looks the same. It will
+        vary somewhat depending on which wrapper is creating the object.
+
+         Args:
+            wrapper: the object creating ExecString
+            conf_svc: the ConfigurationService serving our config lookups
+            runfolder: which runfolder to use
+
+         Returns:
+            Sets its property 'text' to the string that will be executed
+            in a subprocess.
+     """
+    def __init__(self, wrapper, conf_svc, runfolder):
+        self.text = None
+        bin_lookup = wrapper.binary_conf_lookup
+        conf = conf_svc.get_app_config()
+        self.text = [conf["perl"], conf[bin_lookup], "-runfolder", runfolder]
 
 
 class Wrapper(object):
@@ -118,7 +140,6 @@ class Wrapper(object):
             path = runpath + "/sisyphus.yml"
             self.write_new_config_file(path, params["sisyphus_config"])
 
-
     def __get_attr__(self, attr):
         return getattr(self.info, attr)
 
@@ -149,7 +170,6 @@ class Wrapper(object):
             logger.error("Error writing new config file {0}: {1}".
                               format(path, err))
 
-
     def sisyphus_version(self):
         """
         Use Sisyphus own script to check which version is used.
@@ -164,6 +184,9 @@ class Wrapper(object):
     def stop(self):
         pass
 
+    def get_exec_string(self):
+        return ExecStringWithEmailConfig(self, self.conf_svc, self.info.runfolder).text
+
     def run(self):
         """  Creates an execution string that will be unique depending on
              what kind of object did the call to the method. Spawns a subprocess
@@ -177,8 +200,7 @@ class Wrapper(object):
                 proc = subprocess.Popen(["/bin/sleep", "1m"])
                 exec_string = "/bin/sleep 1m"
             else:
-                exec_string = ExecString(self, self.conf_svc,
-                                         self.info.runfolder).text
+                exec_string = self.get_exec_string()
                 proc = subprocess.Popen(exec_string, stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE)
 
@@ -227,9 +249,22 @@ class Wrapper(object):
                                format(wrapper_type))
 
 
-class AeacusStatsWrapper(Wrapper):
+class AeacusBaseWrapper(Wrapper):
+    """
+    Base wrapper for the Aeacus commands
+    """
+    def get_exec_string(self):
+        """
+        Overrides the `Wrapper.get_exec_string` implemenation with an ExecString that does not have
+        an email configuration since those values cannot be passed to the aeacus commands.
+        :return:
+        """
+        return ExecStringBasic(self, self.conf_svc, self.info.runfolder).text
+
+
+class AeacusStatsWrapper(AeacusBaseWrapper):
     """ Wrapper around the aeacus-stats perl script. Inherits behaviour from its
-        base class Wrapper.
+        base class AeacusBaseWrapper.
 
         Args:
             params: Dict of parameters to the wrapper. Must contain the name of
@@ -238,16 +273,15 @@ class AeacusStatsWrapper(Wrapper):
             configuration_svc: the ConfigurationService for our conf lookups
             logger: the Logger object in charge of logging output
     """
-
     def __init__(self, params, configuration_svc, logger=None):
         super(AeacusStatsWrapper, self).__init__(params, configuration_svc, logger)
         self.binary_conf_lookup = "aeacus_stats"
         self.type_txt = Wrapper.AEACUS_STATS_TYPE
 
 
-class AeacusReportsWrapper(Wrapper):
+class AeacusReportsWrapper(AeacusBaseWrapper):
     """ Wrapper around the aeacus-reports perl script. Inherits behaviour from its
-        base class Wrapper.
+        base class AeacusBaseWrapper.
 
         Args:
             params: Dict of parameters to the wrapper. Must contain the name of
