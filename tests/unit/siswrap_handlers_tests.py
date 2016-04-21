@@ -7,7 +7,7 @@ from siswrap.app import *
 from siswrap.handlers import *
 from siswrap.wrapper_services import *
 from siswrap_test_helpers import *
-
+from siswrap.app import routes
 
 # Some unit tests for siswrap.handlers
 
@@ -18,11 +18,8 @@ API_URL = "/api/1.0"
 def app():
     config_svc = ConfigurationService(app_config_path="./config/app.config")
     process_svc = ProcessService(config_svc)
-    args = dict(process_svc=process_svc, config_svc=config_svc)
-    app = tornado.web.Application([
-            (r"/api/1.0/(?:qc|report)/run/([\w_-]+)", RunHandler, args),
-            (r"/api/1.0/(?:qc|report)/status/(\d*)", StatusHandler, args)
-        ], debug=True)
+    #args = dict(process_svc=process_svc, config_svc=config_svc)
+    app = tornado.web.Application(routes(process_svc=process_svc, config_svc=config_svc), debug=True)
     return app
 
 @pytest.fixture
@@ -78,6 +75,26 @@ class TestRunHandler(object):
         payload = {"runfolder": "foo", "sisyphus_config": " "}
         resp = yield http_client.fetch(base_url + API_URL + "/report/run/123",
                                        method="POST", body=json(payload))
+
+    @pytest.mark.gen_test
+    def test_post_aeacus_report_job(self, http_client, http_server, base_url, stub_isdir, stub_sisyphus_version, stub_new_sisyphus_conf):
+        payload = {"runfolder": "foo", "sisyphus_config": TestHelpers.SISYPHUS_CONFIG}
+        resp = yield http_client.fetch(base_url + API_URL + "/aeacusreports/run/123",
+                                       method="POST", body=json(payload))
+
+        assert resp.code == 202
+        payload = jsonpickle.decode(resp.body)
+        assert payload["sisyphus_version"] == "15.3.2"
+        from siswrap import __version__ as version
+        assert payload["service_version"] == version
+        assert payload["runfolder"] == "/data/testarteria1/mon1/foo"
+
+        # Test empty input for sisyphus_conf field; the asserts in my_new_config
+        # should not be run if we sent this in.
+        payload = {"runfolder": "foo", "sisyphus_config": " "}
+        resp = yield http_client.fetch(base_url + API_URL + "/report/run/123",
+                                       method="POST", body=json(payload))
+
 
     @pytest.mark.gen_test
     def test_post_qc_job(self, http_client, http_server, base_url, stub_isdir, stub_sisyphus_version, stub_new_qc_conf):
