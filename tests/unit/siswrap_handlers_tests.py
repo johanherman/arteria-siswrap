@@ -18,8 +18,8 @@ API_URL = "/api/1.0"
 def app():
     config_svc = ConfigurationService(app_config_path="./config/app.config")
     process_svc = ProcessService(config_svc)
-    args = dict(process_svc=process_svc, config_svc=config_svc)
-    app = tornado.web.Application(routes(args), debug=True)
+    #args = dict(process_svc=process_svc, config_svc=config_svc)
+    app = tornado.web.Application(routes(process_svc=process_svc, config_svc=config_svc), debug=True)
     return app
 
 @pytest.fixture
@@ -79,7 +79,7 @@ class TestRunHandler(object):
     @pytest.mark.gen_test
     def test_post_aeacus_report_job(self, http_client, http_server, base_url, stub_isdir, stub_sisyphus_version, stub_new_sisyphus_conf):
         payload = {"runfolder": "foo", "sisyphus_config": TestHelpers.SISYPHUS_CONFIG}
-        resp = yield http_client.fetch(base_url + API_URL + "/report/aeacusreport/run/123",
+        resp = yield http_client.fetch(base_url + API_URL + "/aeacusreports/run/123",
                                        method="POST", body=json(payload))
 
         assert resp.code == 202
