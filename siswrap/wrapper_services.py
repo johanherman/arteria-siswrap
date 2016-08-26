@@ -104,8 +104,7 @@ class ExecStringBasic(object):
 
 
 class Wrapper(object):
-    """ Our main wrapper for the Sisyphus scripts (QuickReport and
-        QualityControl at the moment).
+    """ Our main wrapper for the Sisyphus scripts.
 
         Args:
             params: Dict of parameters to the wrapper. Must contain the name of
@@ -123,6 +122,7 @@ class Wrapper(object):
     REPORT_TYPE = "report"
     AEACUS_STATS_TYPE = "aeacusstats"
     AEACUS_REPORTS_TYPE = "aeacusreports"
+    CHECK_INDICES_TYPE = "checkindices"
 
     def __init__(self, params, configuration_svc, logger=None):
         self.conf_svc = configuration_svc
@@ -227,6 +227,8 @@ class Wrapper(object):
             return Wrapper.AEACUS_STATS_TYPE
         elif first_match == Wrapper.AEACUS_REPORTS_TYPE:
             return Wrapper.AEACUS_REPORTS_TYPE
+        elif first_match == Wrapper.CHECK_INDICES_TYPE:
+            return Wrapper.CHECK_INDICES_TYPE
         else:
             raise RuntimeError("Unknown wrapper runner requested: {0}".
                                format(url))
@@ -244,6 +246,8 @@ class Wrapper(object):
             return AeacusStatsWrapper(runfolder, configuration_svc)
         elif wrapper_type == Wrapper.AEACUS_REPORTS_TYPE:
             return AeacusReportsWrapper(runfolder, configuration_svc)
+        elif wrapper_type == Wrapper.CHECK_INDICES_TYPE:
+            return CheckIndicesWrapper(runfolder, configuration_svc)
         else:
             raise RuntimeError("Unknown wrapper runner requested: {0}".
                                format(wrapper_type))
@@ -312,6 +316,25 @@ class ReportWrapper(Wrapper):
         super(ReportWrapper, self).__init__(params, configuration_svc, logger)
         self.binary_conf_lookup = "report_bin"
         self.type_txt = Wrapper.REPORT_TYPE
+
+
+class CheckIndicesWrapper(Wrapper):
+    """ Wrapper around the CheckIndexes perl script. Inherits behaviour from its
+        base class Wrapper.
+
+        Args:
+            params: Dict of parameters to the wrapper. Must contain the name of
+                    the runfolder to use (not full path). Can contain a YAML
+                    object containing the Sisyphus config to use.
+            configuration_svc: the ConfigurationService for our conf lookups
+            logger: the Logger object in charge of logging output
+    """
+
+    def __init__(self, params, configuration_svc, logger=None):
+        super(CheckIndicesWrapper, self).__init__(params, configuration_svc, logger)
+        self.binary_conf_lookup = "checkindices"
+        self.type_txt = Wrapper.CHECK_INDICES_TYPE
+
 
 class QCWrapper(Wrapper):
     """ Wrapper around the QualityControl perl script. Inherits behaviour from
