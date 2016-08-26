@@ -1,9 +1,0 @@
-#!/bin/bash
-
-cp ./siswrap-wsd /etc/init.d/
-
-if test -f /etc/redhat-release ; then
-     sudo chkconfig --add supervisord
- else
-     sudo update-rc.d siswrap-wsd defaults
-fi
