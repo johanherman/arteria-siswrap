@@ -253,7 +253,7 @@ class Wrapper(object):
                                format(wrapper_type))
 
 
-class AeacusBaseWrapper(Wrapper):
+class BaseWrapperWithoutEmail(Wrapper):
     """
     Base wrapper for the Aeacus commands
     """
@@ -266,7 +266,7 @@ class AeacusBaseWrapper(Wrapper):
         return ExecStringBasic(self, self.conf_svc, self.info.runfolder).text
 
 
-class AeacusStatsWrapper(AeacusBaseWrapper):
+class AeacusStatsWrapper(BaseWrapperWithoutEmail):
     """ Wrapper around the aeacus-stats perl script. Inherits behaviour from its
         base class AeacusBaseWrapper.
 
@@ -283,7 +283,7 @@ class AeacusStatsWrapper(AeacusBaseWrapper):
         self.type_txt = Wrapper.AEACUS_STATS_TYPE
 
 
-class AeacusReportsWrapper(AeacusBaseWrapper):
+class AeacusReportsWrapper(BaseWrapperWithoutEmail):
     """ Wrapper around the aeacus-reports perl script. Inherits behaviour from its
         base class AeacusBaseWrapper.
 
@@ -318,7 +318,7 @@ class ReportWrapper(Wrapper):
         self.type_txt = Wrapper.REPORT_TYPE
 
 
-class CheckIndicesWrapper(Wrapper):
+class CheckIndicesWrapper(BaseWrapperWithoutEmail):
     """ Wrapper around the CheckIndexes perl script. Inherits behaviour from its
         base class Wrapper.
 

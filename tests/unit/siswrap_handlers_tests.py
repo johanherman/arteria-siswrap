@@ -42,7 +42,7 @@ def json(payload):
 @pytest.fixture
 def stub_new_sisyphus_conf(monkeypatch):
     def my_new_config(self, path, content):
-        assert path == "/data/testarteria1/mon1/foo/sisyphus.yml"
+        assert path == "/vagrant/foo/sisyphus.yml"
         assert content == TestHelpers.SISYPHUS_CONFIG
 
     monkeypatch.setattr("siswrap.wrapper_services.Wrapper.write_new_config_file", my_new_config)
@@ -50,7 +50,7 @@ def stub_new_sisyphus_conf(monkeypatch):
 @pytest.fixture
 def stub_new_qc_conf(monkeypatch):
     def my_new_config(self, path, content):
-        assert path == "/data/testarteria1/mon1/foo/sisyphus_qc.xml"
+        assert path == "/vagrant/foo/sisyphus_qc.xml"
         assert content == TestHelpers.QC_CONFIG
 
     monkeypatch.setattr("siswrap.wrapper_services.Wrapper.write_new_config_file", my_new_config)
@@ -68,7 +68,7 @@ class TestRunHandler(object):
         assert payload["sisyphus_version"] == "15.3.2"
         from siswrap import __version__ as version
         assert payload["service_version"] == version
-        assert payload["runfolder"] == "/data/testarteria1/mon1/foo"
+        assert payload["runfolder"] == "/vagrant/foo"
 
         # Test empty input for sisyphus_conf field; the asserts in my_new_config
         # should not be run if we sent this in.
@@ -87,7 +87,7 @@ class TestRunHandler(object):
         assert payload["sisyphus_version"] == "15.3.2"
         from siswrap import __version__ as version
         assert payload["service_version"] == version
-        assert payload["runfolder"] == "/data/testarteria1/mon1/foo"
+        assert payload["runfolder"] == "/vagrant/foo"
 
         # Test empty input for sisyphus_conf field; the asserts in my_new_config
         # should not be run if we sent this in.
@@ -107,7 +107,7 @@ class TestRunHandler(object):
         assert payload["sisyphus_version"] == "15.3.2"
         from siswrap import __version__ as version
         assert payload["service_version"] == version
-        assert payload["runfolder"] == "/data/testarteria1/mon1/foo"
+        assert payload["runfolder"] == "/vagrant/foo"
 
         # Test empty input for sisyphus_conf field; the asserts in my_new_config
         # should not be run if we sent this in, but we should receive an http error 500.

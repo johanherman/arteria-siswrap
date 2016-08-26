@@ -2,6 +2,31 @@ A self contained (Tornado) REST service for managing running of external Sisyphu
 such as the quick report generator and quality control suite. Listens on port
 10900 for various commands. Try accessing e.g. http://localhost:10900/api/1.0
 
+
+TODO Rewrite
+
+NOTES:
+
+# Setup vagrant env
+vagrant up
+
+# Prepare environment
+vagrant ssh
+cd /vagrant
+virtualenv venv
+source venv/bin/activate
+pip install -e .
+pip install -r requirements/dev
+
+# Run service
+siswrap-ws --configroot config/ --port 10900 --debug
+
+# In separate console, run:
+curl -X POST --data '{"runfolder":"160824_M00485_0293_000000000-ALRHK"}' localhost:10900/api/1.0/checkindices/run/160824_M00485_0293_000000000-ALRHK
+curl http://localhost:10900/api/1.0/checkindices/status/12850
+
+
+
 Manual installation (tested with python > 2.7.6):
     # Install the dependencies and the arteria-siswrap package
     virtualenv /opt/arteria/arteria-siswrap-env
