@@ -53,7 +53,7 @@ Vagrant.configure("2") do |config|
     perl cpanm_install.pl App::cpanminus
     sudo cpanm File::NFSLock
 
-    git clone https://github.com/Molmed/sisyphus.git deps/sisyphus
+    git clone https://github.com/Molmed/sisyphus.git /vagrant/deps/sisyphus
 
     sudo yum install -y python-virtualenv
 

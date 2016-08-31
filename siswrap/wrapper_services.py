@@ -35,6 +35,8 @@ class ProcessInfo(object):
         self.msg = msg
         self.pid = pid
         self.link = None
+        self.stdout = None
+        self.stderr = None
 
     def __str__(self):
         return "{0} {3}: {1}@{2}".format(self.state, self.runfolder,
@@ -452,6 +454,9 @@ class ProcessService(object):
                 wrapper.info.msg = ("Process was completed successfully with "
                                     "return code ") + str(returncode) + "."
 
+                wrapper.info.stdout = out
+                wrapper.info.stderr = err
+
                 if out is None:
                     out = "(no txt msg)"
 
@@ -463,11 +468,11 @@ class ProcessService(object):
                 # killed off.
                 if wrapper.info.state is not State.ERROR:
                     out, err = proc.communicate()
-                    wrapper.info.msg = {"message": "Process was completed successfully, "
-                                        "but encounted an error, with return "
-                                        "code {}.".format(returncode),
-                                        "stdout": out,
-                                        "stderr": err}
+                    wrapper.info.msg = "Process was completed successfully, " \
+                                       "but encounted an error, with return " \
+                                       "code {}.".format(returncode)
+                    wrapper.info.stdout = out
+                    wrapper.info.stderr = err
                     debugmsg = "Message was: " + err
                     wrapper.info.state = State.ERROR
             except OSError, err:

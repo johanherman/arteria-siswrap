@@ -27,6 +27,11 @@ pip install -e .
 pip install -r requirements/dev
 
 # ------------------
+# Run unit tests
+# ------------------
+py.test tests/unit/*.py
+
+# ------------------
 # Run service to test it
 # ------------------
 siswrap-ws --configroot config/ --port 10900 --debug
