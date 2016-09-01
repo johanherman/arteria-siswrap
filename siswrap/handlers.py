@@ -190,7 +190,9 @@ class StatusHandler(BaseSiswrapHandler):
                 payload = {"pid": response.pid,
                            "state": response.state,
                            "host": response.host,
-                           "msg": response.msg}
+                           "msg": response.msg,
+                           "stdout": response.stdout,
+                           "stderr": response.stderr}
 
                 # If the process was found then we also want to return
                 # the runfolder

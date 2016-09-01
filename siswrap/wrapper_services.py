@@ -35,6 +35,8 @@ class ProcessInfo(object):
         self.msg = msg
         self.pid = pid
         self.link = None
+        self.stdout = None
+        self.stderr = None
 
     def __str__(self):
         return "{0} {3}: {1}@{2}".format(self.state, self.runfolder,
@@ -104,8 +106,7 @@ class ExecStringBasic(object):
 
 
 class Wrapper(object):
-    """ Our main wrapper for the Sisyphus scripts (QuickReport and
-        QualityControl at the moment).
+    """ Our main wrapper for the Sisyphus scripts.
 
         Args:
             params: Dict of parameters to the wrapper. Must contain the name of
@@ -123,6 +124,7 @@ class Wrapper(object):
     REPORT_TYPE = "report"
     AEACUS_STATS_TYPE = "aeacusstats"
     AEACUS_REPORTS_TYPE = "aeacusreports"
+    CHECK_INDICES_TYPE = "checkindices"
 
     def __init__(self, params, configuration_svc, logger=None):
         self.conf_svc = configuration_svc
@@ -227,6 +229,8 @@ class Wrapper(object):
             return Wrapper.AEACUS_STATS_TYPE
         elif first_match == Wrapper.AEACUS_REPORTS_TYPE:
             return Wrapper.AEACUS_REPORTS_TYPE
+        elif first_match == Wrapper.CHECK_INDICES_TYPE:
+            return Wrapper.CHECK_INDICES_TYPE
         else:
             raise RuntimeError("Unknown wrapper runner requested: {0}".
                                format(url))
@@ -244,27 +248,29 @@ class Wrapper(object):
             return AeacusStatsWrapper(runfolder, configuration_svc)
         elif wrapper_type == Wrapper.AEACUS_REPORTS_TYPE:
             return AeacusReportsWrapper(runfolder, configuration_svc)
+        elif wrapper_type == Wrapper.CHECK_INDICES_TYPE:
+            return CheckIndicesWrapper(runfolder, configuration_svc)
         else:
             raise RuntimeError("Unknown wrapper runner requested: {0}".
                                format(wrapper_type))
 
 
-class AeacusBaseWrapper(Wrapper):
+class BaseWrapperWithoutEmail(Wrapper):
     """
-    Base wrapper for the Aeacus commands
+    Base wrapper for the commands that do not use a e-mail argument, e.g. the Aeacus commands.
     """
     def get_exec_string(self):
         """
-        Overrides the `Wrapper.get_exec_string` implemenation with an ExecString that does not have
-        an email configuration since those values cannot be passed to the aeacus commands.
+        Overrides the `Wrapper.get_exec_string` implementation with an ExecString that does not have
+        an email configuration since those values cannot be passed to e.g. the aeacus commands.
         :return:
         """
         return ExecStringBasic(self, self.conf_svc, self.info.runfolder).text
 
 
-class AeacusStatsWrapper(AeacusBaseWrapper):
+class AeacusStatsWrapper(BaseWrapperWithoutEmail):
     """ Wrapper around the aeacus-stats perl script. Inherits behaviour from its
-        base class AeacusBaseWrapper.
+        base class BaseWrapperWithoutEmail.
 
         Args:
             params: Dict of parameters to the wrapper. Must contain the name of
@@ -279,9 +285,9 @@ class AeacusStatsWrapper(AeacusBaseWrapper):
         self.type_txt = Wrapper.AEACUS_STATS_TYPE
 
 
-class AeacusReportsWrapper(AeacusBaseWrapper):
+class AeacusReportsWrapper(BaseWrapperWithoutEmail):
     """ Wrapper around the aeacus-reports perl script. Inherits behaviour from its
-        base class AeacusBaseWrapper.
+        base class BaseWrapperWithoutEmail.
 
         Args:
             params: Dict of parameters to the wrapper. Must contain the name of
@@ -312,6 +318,25 @@ class ReportWrapper(Wrapper):
         super(ReportWrapper, self).__init__(params, configuration_svc, logger)
         self.binary_conf_lookup = "report_bin"
         self.type_txt = Wrapper.REPORT_TYPE
+
+
+class CheckIndicesWrapper(BaseWrapperWithoutEmail):
+    """ Wrapper around the CheckIndexes perl script. Inherits behaviour from its
+        base class Wrapper.
+
+        Args:
+            params: Dict of parameters to the wrapper. Must contain the name of
+                    the runfolder to use (not full path). Can contain a YAML
+                    object containing the Sisyphus config to use.
+            configuration_svc: the ConfigurationService for our conf lookups
+            logger: the Logger object in charge of logging output
+    """
+
+    def __init__(self, params, configuration_svc, logger=None):
+        super(CheckIndicesWrapper, self).__init__(params, configuration_svc, logger)
+        self.binary_conf_lookup = "checkindices"
+        self.type_txt = Wrapper.CHECK_INDICES_TYPE
+
 
 class QCWrapper(Wrapper):
     """ Wrapper around the QualityControl perl script. Inherits behaviour from
@@ -429,6 +454,9 @@ class ProcessService(object):
                 wrapper.info.msg = ("Process was completed successfully with "
                                     "return code ") + str(returncode) + "."
 
+                wrapper.info.stdout = out
+                wrapper.info.stderr = err
+
                 if out is None:
                     out = "(no txt msg)"
 
@@ -440,11 +468,11 @@ class ProcessService(object):
                 # killed off.
                 if wrapper.info.state is not State.ERROR:
                     out, err = proc.communicate()
-                    wrapper.info.msg = {"message": "Process was completed successfully, "
-                                        "but encounted an error, with return "
-                                        "code {}.".format(returncode),
-                                        "stdout": out,
-                                        "stderr": err}
+                    wrapper.info.msg = "Process was completed successfully, " \
+                                       "but encounted an error, with return " \
+                                       "code {}.".format(returncode)
+                    wrapper.info.stdout = out
+                    wrapper.info.stderr = err
                     debugmsg = "Message was: " + err
                     wrapper.info.state = State.ERROR
             except OSError, err:

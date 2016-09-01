@@ -7,9 +7,9 @@ from siswrap.wrapper_services import ProcessService
 
 def routes(**kwargs):
     return [
-        url(r"/api/1.0/(?:qc|report|aeacusstats|aeacusreports)/run/([\w_-]+)",
+        url(r"/api/1.0/(?:qc|report|aeacusstats|aeacusreports|checkindices)/run/([\w_-]+)",
             RunHandler, name="run", kwargs=kwargs),
-        url(r"/api/1.0/(?:qc|report|aeacusstats|aeacusreports)/status/(\d*)",
+        url(r"/api/1.0/(?:qc|report|aeacusstats|aeacusreports|checkindices)/status/(\d*)",
             StatusHandler, name="status", kwargs=kwargs)]
 
 def start():

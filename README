@@ -1,36 +1,49 @@
-A self contained (Tornado) REST service for managing running of external Sisyphus commands
-such as the quick report generator and quality control suite. Listens on port
-10900 for various commands. Try accessing e.g. http://localhost:10900/api/1.0
+Arteria Siswrap
+===============
+A self contained (Tornado) REST service for managing running of external [Sisyphus](https://github.com/Molmed/Sisyphus)
+commands such as the quick report generator and quality control suite.
 
-Manual installation (tested with python > 2.7.6):
-    # Install the dependencies and the arteria-siswrap package
-    virtualenv /opt/arteria/arteria-siswrap-env
-    source /opt/arteria/arteria-siswrap-env/bin/activate
-    pip install -r requirements/dev
-    python setup.py install
 
-Manual run
-    /opt/arteria/arteria-siswrap/bin/siswrap-ws --port 10900 --configroot ./config/ --debug
+Development and usage examples
+------------------------------
 
-Manual tests
-    py.test tests/integration/rest_tests.py
+To make development on this service easier a [Vagrant](https://www.vagrantup.com/) environment is provided.
+Here are some brief notes on how to get it working.
 
-Setup with bells and whistles (not actively supported anymore)
-    # Use the install script for installation of service and controller scripts.
-    # Also runs integration tests in the end
-    ./scripts/install
+```
+# ------------------
+# Setup vagrant env
+# ------------------
+vagrant up
 
-    # Manually control the service afterwards with
-    /etc/init.d/siswrap-wsd
+# ------------------
+# Prepare environment
+# ------------------
+vagrant ssh
+cd /vagrant
+virtualenv venv
+source venv/bin/activate
+pip install -e .
+pip install -r requirements/dev
 
-    # Manually run integration tests afterwards with
-    /usr/local/bin/siswrap-ws-test
+# ------------------
+# Run unit tests
+# ------------------
+py.test tests/unit/*.py
 
-Testing within a Docker container
-    # This requires access to some of our internal base images
-    docker build arteria/siswrap .
-    docker run -t -i --name siswrap -p 10900:10900 -v `pwd`:/arteria/arteria-lib/siswrap arteria/siswrap /bin/bash
-    # Now you can run the setup and test steps above; and easily re-start everything from scratch
-    # by exiting the container and doing
-    docker rm siswrap
-    # followed by the two earlier docker commands again.
+# ------------------
+# Run service to test it
+# ------------------
+siswrap-ws --configroot config/ --port 10900 --debug
+
+
+# Example 1: To get a overview of the api run:
+curl http://localhost:10900/api | python -m json.tool
+
+# Example 2: To start a index checking job run
+curl -X POST --data '{"runfolder":"160824_M00485_0293_000000000-ALRHK"}' localhost:10900/api/1.0/checkindices/run/160824_M00485_0293_000000000-ALRHK
+
+# Example 3: To check the status a job, query the link returned when starting it, e.g.
+curl http://localhost:10900/api/1.0/checkindices/status/<job_id>
+
+```

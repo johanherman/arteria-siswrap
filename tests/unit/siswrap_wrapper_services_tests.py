@@ -12,7 +12,7 @@ class TestProcessInfo(object):
 
     STATE_NONE = "none"
     STATE_STARTED = "started"
-    NR_ELEMENTS = 7  # runfolder, host, state, proc, msg, pid, link
+    NR_ELEMENTS = 9  # runfolder, host, state, proc, msg, pid, link, stdout, stderr
 
     # A newly created object should be STATE_NONE, and
     # have the right number of properties
@@ -95,6 +95,26 @@ class TestReportWrapper(object):
     # And we should inherit from the base Wrapper class
     def test_inheritance(self, stub_isdir):
         assert issubclass(ReportWrapper, Wrapper) is True
+
+
+class CheckIndicesWrapper(object):
+
+    # The CheckIndicesWrapper class should be setup properly
+    def test_creation(self, stub_isdir):
+        report = (Helper.params, Helper.conf)
+        assert report.binary_conf_lookup == "checkindices"
+        assert report.type_txt == Wrapper.CHECK_INDICES_TYPE
+        assert isinstance(report.conf_svc, ConfigurationService) is True
+
+    # We should be able to access the ProcessInfo's attributes
+    def test_info_attr(self, stub_isdir):
+        report = ReportWrapper(Helper.params, Helper.conf)
+        assert isinstance(report.info, ProcessInfo) is True
+        assert report.info.runfolder == Helper.root + "/" + Helper.runfolder
+
+    # And we should inherit from the base Wrapper class
+    def test_inheritance(self, stub_isdir):
+        assert issubclass(CheckIndicesWrapper, Wrapper) is True
 
 
 class TestWrapper(object):
@@ -383,12 +403,12 @@ class TestProcessService(object):
 
         test_stderr_wrapper = WrapperStub(["ech", "Hello World"])
         result_std_err = run_test_with_wrapper(test_stderr_wrapper)
-        assert result_std_err.msg.get("stderr").strip() == "Hello World: 1: Hello World: ech: not found"
+        assert result_std_err.stderr.strip() == "Hello World: 1: Hello World: ech: not found"
 
         test_stdout_wrapper = WrapperStub("echo Hello World && echo Hello Human 1>&2 && false")
         result_std_out = run_test_with_wrapper(test_stdout_wrapper)
-        assert result_std_out.msg.get("stdout").strip() == "Hello World"
-        assert result_std_out.msg.get("stderr").strip() == "Hello Human"
+        assert result_std_out.stdout.strip() == "Hello World"
+        assert result_std_out.stderr.strip() == "Hello Human"
 
     # Test that we can check the status of a specific process in the
     # process queue
