@@ -257,12 +257,12 @@ class Wrapper(object):
 
 class BaseWrapperWithoutEmail(Wrapper):
     """
-    Base wrapper for the Aeacus commands
+    Base wrapper for the commands that do not use a e-mail argument, e.g. the Aeacus commands.
     """
     def get_exec_string(self):
         """
-        Overrides the `Wrapper.get_exec_string` implemenation with an ExecString that does not have
-        an email configuration since those values cannot be passed to the aeacus commands.
+        Overrides the `Wrapper.get_exec_string` implementation with an ExecString that does not have
+        an email configuration since those values cannot be passed to e.g. the aeacus commands.
         :return:
         """
         return ExecStringBasic(self, self.conf_svc, self.info.runfolder).text
@@ -270,7 +270,7 @@ class BaseWrapperWithoutEmail(Wrapper):
 
 class AeacusStatsWrapper(BaseWrapperWithoutEmail):
     """ Wrapper around the aeacus-stats perl script. Inherits behaviour from its
-        base class AeacusBaseWrapper.
+        base class BaseWrapperWithoutEmail.
 
         Args:
             params: Dict of parameters to the wrapper. Must contain the name of
@@ -287,7 +287,7 @@ class AeacusStatsWrapper(BaseWrapperWithoutEmail):
 
 class AeacusReportsWrapper(BaseWrapperWithoutEmail):
     """ Wrapper around the aeacus-reports perl script. Inherits behaviour from its
-        base class AeacusBaseWrapper.
+        base class BaseWrapperWithoutEmail.
 
         Args:
             params: Dict of parameters to the wrapper. Must contain the name of
