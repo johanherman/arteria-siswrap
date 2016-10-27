@@ -10,7 +10,7 @@ setup(
     name='siswrap',
     version=__version__,
     description="Wrapper for the Sisyphus tools suite",
-    long_description=read_file('README'),
+    long_description=read_file('README.md'),
     keywords='bioinformatics',
     author='SNP&SEQ Technology Platform, Uppsala University',
     packages=find_packages(),
